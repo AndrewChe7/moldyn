@@ -15,5 +15,4 @@ pub fn initialize_velocities_for_gas (state: &mut State, temperature: f64, mass:
         particle.velocity.y = y;
         particle.velocity.z = z;
     }
-
 }
