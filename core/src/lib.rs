@@ -1,15 +1,21 @@
 mod particle;
+mod particles_database;
 extern crate nalgebra as na;
 extern crate serde;
+extern crate lazy_static;
+extern crate rayon;
 
 pub use particle::Particle;
 pub use particle::State;
+pub use particles_database::ParticleDatabase;
+
+pub const K_B: f64 = 1.380648528;
 
 #[cfg(test)]
 mod tests {
     use na::Vector3;
-    use crate::State;
-    use crate::Particle;
+    use rayon::prelude::*;
+    use crate::{ParticleDatabase, State, Particle};
 
     fn test_particle() -> Particle {
         Particle {
@@ -55,5 +61,36 @@ mod tests {
         for p in &deserialized.particles {
             check_particle_equality(p, &particle);
         }
+    }
+
+    #[test]
+    fn particle_database () {
+        ParticleDatabase::add(0, "test_particle", 0.1337);
+        ParticleDatabase::add(1, "test_particle2", 0.273);
+        ParticleDatabase::add(2, "test_particle3", 0.272);
+
+        assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1337);
+        assert_eq!(ParticleDatabase::get_particle_mass(1).unwrap(), 0.273);
+        assert_eq!(ParticleDatabase::get_particle_mass(2).unwrap(), 0.272);
+        assert_eq!(ParticleDatabase::get_particle_mass(3), None);
+        ParticleDatabase::clear_particles();
+        assert_eq!(ParticleDatabase::get_particle_mass(0), None);
+        assert_eq!(ParticleDatabase::get_particle_mass(1), None);
+        assert_eq!(ParticleDatabase::get_particle_mass(2), None);
+        assert_eq!(ParticleDatabase::get_particle_mass(3), None);
+    }
+
+    #[test]
+    fn particle_database_multithreaded () {
+        let _ = (0..4).into_par_iter().for_each(|i| {
+            ParticleDatabase::add(i, "test_particle", 0.1337);
+        });
+        assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1337);
+        assert_eq!(ParticleDatabase::get_particle_mass(1).unwrap(), 0.1337);
+        assert_eq!(ParticleDatabase::get_particle_mass(2).unwrap(), 0.1337);
+        assert_eq!(ParticleDatabase::get_particle_mass(3).unwrap(), 0.1337);
+        let _ = (0..4).into_par_iter().for_each(|i| {
+            assert_eq!(ParticleDatabase::get_particle_mass(i).unwrap(), 0.1337);
+        });
     }
 }

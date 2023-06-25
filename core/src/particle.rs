@@ -15,11 +15,25 @@ pub struct Particle {
     /// Mass of particle
     pub mass: f64,
     /// ID of particle. Defines type of particle
-    pub id: i16,
+    pub id: u16,
 }
 
 /// Structure that keeps current state
 #[derive(Serialize, Deserialize)]
 pub struct State {
     pub particles: Vec<Particle>,
+}
+
+impl Particle {
+    /// Create empty particle
+    pub fn new() -> Self {
+        Particle {
+            position: Vector3::new(0.0,0.0,0.0),
+            velocity: Vector3::new(0.0,0.0,0.0),
+            force: Vector3::new(0.0,0.0,0.0),
+            potential: 0.0,
+            id: 0,
+            mass: 0.0,
+        }
+    }
 }
