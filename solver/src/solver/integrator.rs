@@ -1,6 +1,6 @@
 use moldyn_core::State;
+use crate::solver::Potential;
 
 pub trait Integrator {
-    fn calculate_before_force(&self, state: &mut State, delta_time: f64);
-    fn calculate_after_force(&self, state: &mut State, delta_time: f64);
+    fn calculate(&self, state: &mut State, delta_time: f64, potential: &impl Potential);
 }

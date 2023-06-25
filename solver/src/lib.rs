@@ -122,11 +122,7 @@ mod tests {
             assert_eq!(format!("{:.8}", f2.y), "0.00000000");
             assert_eq!(format!("{:.8}", f2.z), "0.00000000");
         }
-        { // Step
-            verlet.calculate_before_force(&mut state, 0.002);
-            update_force(&mut state, &lennard_jones_potential);
-            verlet.calculate_after_force(&mut state, 0.002);
-        }
+        verlet.calculate(&mut state, 0.002, &lennard_jones_potential);
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
