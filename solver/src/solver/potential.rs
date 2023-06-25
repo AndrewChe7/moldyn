@@ -1,3 +1,4 @@
+use na::Vector3;
 use rayon::prelude::*;
 use moldyn_core::State;
 
@@ -8,6 +9,13 @@ pub trait Potential: Sync + Send {
 
 pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
     let number_particles = state.particles.len();
+
+    state.particles.par_iter_mut().for_each(|particle| {
+        let particle = particle.get_mut().expect("Can't lock particle");
+        particle.force.x = 0.0;
+        particle.force.y = 0.0;
+        particle.force.z = 0.0;
+    });
 
     (0..number_particles).into_par_iter().for_each(|i| {
         for j in 0..i {
