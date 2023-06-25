@@ -58,8 +58,8 @@ mod tests {
 
     #[test]
     fn update_force_lennard_jones () {
-        let p1 = Particle::new();
-        let mut p2 = Particle::new();
+        let p1 = Particle::default();
+        let mut p2 = Particle::default();
         p2.position.x = 0.5;
         let mut state = State {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
@@ -74,8 +74,8 @@ mod tests {
 
     #[test]
     fn verlet_with_lennard_jones () {
-        let mut p1 = Particle::new();
-        let mut p2 = Particle::new();
+        let mut p1 = Particle::default();
+        let mut p2 = Particle::default();
         p1.position = Vector3::new(0.75, 0.75, 0.5);
         p2.position = Vector3::new(1.25, 0.75, 0.5);
         p1.velocity = Vector3::new(1.0, 1.0, 0.0);

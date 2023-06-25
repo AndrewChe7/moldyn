@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 use na::Vector3;
 use serde::{Deserialize, Serialize};
+use crate::ParticleDatabase;
 
 /// Structure that keeps all data for particle
 #[derive(Serialize, Deserialize)]
@@ -27,7 +28,24 @@ pub struct State {
 
 impl Particle {
     /// Create empty particle
-    pub fn new() -> Self {
+    pub fn new(particle_id: u16,
+               position: Vector3<f64>,
+               velocity: Vector3<f64>) -> Option<Self> {
+        ParticleDatabase::get_particle_mass(particle_id)?;
+        let mass = ParticleDatabase::get_particle_mass(particle_id).unwrap();
+        Some(Particle {
+            position,
+            velocity,
+            force: Vector3::new(0.0,0.0,0.0),
+            potential: 0.0,
+            id: particle_id,
+            mass,
+        })
+    }
+}
+
+impl Default for Particle {
+    fn default() -> Self {
         Particle {
             position: Vector3::new(0.0,0.0,0.0),
             velocity: Vector3::new(0.0,0.0,0.0),

@@ -11,7 +11,7 @@ pub enum InitError {
 pub fn initialize_particles (number_particles: usize) -> State {
     let mut particles: Vec<Mutex<Particle>> = vec![];
     for _ in 0..number_particles {
-        particles.push(Mutex::new(Particle::new()));
+        particles.push(Mutex::new(Particle::default()));
     }
     State {particles}
 }
@@ -24,7 +24,7 @@ pub fn initialize_particles_position(state: &mut State,
                                      start_position: (f64, f64, f64),
                                      grid_size: (usize, usize, usize),
                                      unit_cell_size: f64) -> Result<(), InitError> {
-    if ParticleDatabase::get_particle_mass(particle_id) == None {
+    if ParticleDatabase::get_particle_mass(particle_id).is_none() {
         return Err(InitError::ParticleIdDidNotFound);
     }
     if first_particle + grid_size.0 * grid_size.1 * grid_size.2 > state.particles.len() {

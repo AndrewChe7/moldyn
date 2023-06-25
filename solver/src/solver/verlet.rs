@@ -9,11 +9,9 @@ impl Integrator for VerletMethod {
         state.particles.par_iter_mut().for_each(|particle| {
             let particle = particle.get_mut().expect("Can't lock particle");
             let acceleration = particle.force / particle.mass;
-            particle.position =
-                particle.position +
-                particle.velocity * delta_time +
+            particle.position += particle.velocity * delta_time +
                 acceleration * delta_time * delta_time / 2.0;
-            particle.velocity = particle.velocity + acceleration * delta_time / 2.0;
+            particle.velocity += acceleration * delta_time / 2.0;
         });
     }
 
@@ -21,7 +19,7 @@ impl Integrator for VerletMethod {
         state.particles.par_iter_mut().for_each(|particle| {
             let particle = particle.get_mut().expect("Can't lock particle");
             let acceleration = particle.force / particle.mass;
-            particle.velocity = particle.velocity + acceleration * delta_time / 2.0;
+            particle.velocity += acceleration * delta_time / 2.0;
         });
     }
 }

@@ -1,4 +1,3 @@
-use na::Vector3;
 use rayon::prelude::*;
 use moldyn_core::State;
 
