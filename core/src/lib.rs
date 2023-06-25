@@ -13,6 +13,7 @@ pub const K_B: f64 = 1.380648528;
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
     use na::Vector3;
     use rayon::prelude::*;
     use crate::{ParticleDatabase, State, Particle};
@@ -52,13 +53,14 @@ mod tests {
         let particle = test_particle();
 
         let state = State {
-            particles: vec![test_particle(), test_particle()],
+            particles: vec![Mutex::new(test_particle()), Mutex::new(test_particle())],
         };
 
         let serialized = ron::to_string(&state).unwrap();
         let deserialized: State = ron::from_str(&serialized).unwrap();
 
         for p in &deserialized.particles {
+            let ref p = p.lock().expect("Can't lock particle");
             check_particle_equality(p, &particle);
         }
     }

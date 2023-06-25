@@ -30,6 +30,15 @@ impl ParticleDatabase {
         }
     }
 
+    pub fn get_particle_name(id: u16) -> Option<String> {
+        let particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
+        if particle_data_locked.contains_key(&id) {
+            Some(particle_data_locked.get(&id).unwrap().name.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn clear_particles() {
         let mut particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
         particle_data_locked.clear();

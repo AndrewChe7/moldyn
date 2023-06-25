@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use na::Vector3;
 use moldyn_core::{State, Particle, ParticleDatabase};
 
@@ -8,9 +9,9 @@ pub enum InitError {
 }
 
 pub fn initialize_particles (number_particles: usize) -> State {
-    let mut particles: Vec<Particle> = vec![];
+    let mut particles: Vec<Mutex<Particle>> = vec![];
     for _ in 0..number_particles {
-        particles.push(Particle::new());
+        particles.push(Mutex::new(Particle::new()));
     }
     State {particles}
 }
@@ -32,18 +33,12 @@ pub fn initialize_particles_position(state: &mut State,
     for x in 0..grid_size.0 {
         for y in 0..grid_size.1 {
             for z in 0..grid_size.2 {
-                state.particles[
-                        first_particle + x*grid_size.1*grid_size.2 + y*grid_size.2 + z
-                    ] = Particle {
-                        position: Vector3::new(start_position.0 + x as f64 * unit_cell_size,
-                                               start_position.1 + y as f64 * unit_cell_size,
-                                               start_position.2 + z as f64 * unit_cell_size),
-                        velocity: Vector3::new(0.0,0.0,0.0),
-                        force: Vector3::new(0.0,0.0,0.0),
-                        potential: 0.0,
-                        id: particle_id,
-                        mass: ParticleDatabase::get_particle_mass(particle_id).unwrap(),
-                    };
+                let particle = state.particles[first_particle + x*grid_size.1*grid_size.2 + y*grid_size.2 + z].get_mut().expect("Can't lock particle");
+                particle.position = Vector3::new(start_position.0 + x as f64 * unit_cell_size,
+                                                 start_position.1 + y as f64 * unit_cell_size,
+                                                 start_position.2 + z as f64 * unit_cell_size);
+                particle.id = particle_id;
+                particle.mass = ParticleDatabase::get_particle_mass(particle_id).unwrap();
             }
         }
     }

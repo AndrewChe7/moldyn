@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use na::Vector3;
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +22,7 @@ pub struct Particle {
 /// Structure that keeps current state
 #[derive(Serialize, Deserialize)]
 pub struct State {
-    pub particles: Vec<Particle>,
+    pub particles: Vec<Mutex<Particle>>,
 }
 
 impl Particle {
