@@ -4,6 +4,7 @@ use moldyn_core::State;
 pub trait Potential: Sync + Send {
     fn get_potential (&self, r: f64) -> f64;
     fn get_force (&self, r: f64) -> f64;
+    fn get_potential_and_force (&self, r: f64) -> (f64, f64);
 }
 
 pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
@@ -14,6 +15,7 @@ pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
         particle.force.x = 0.0;
         particle.force.y = 0.0;
         particle.force.z = 0.0;
+        particle.potential = 0.0;
     });
 
     (0..number_particles).into_par_iter().for_each(|i| {
@@ -23,15 +25,17 @@ pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
                 let p2 = &state.particles[j].lock().expect("Can't lock particle");
                 p2.position - p1.position
             };
-            let force = potential.get_force(r.magnitude());
+            let (potential, force) = potential.get_potential_and_force(r.magnitude());
             let force_vec = r.normalize() * force;
             {
                 let p1 = &mut state.particles[i].lock().expect("Can't lock particle");
                 p1.force += force_vec;
+                p1.potential += potential;
             }
             {
                 let p2 = &mut state.particles[j].lock().expect("Can't lock particle");
                 p2.force -= force_vec;
+                p2.potential += potential;
             }
         }
     });

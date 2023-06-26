@@ -28,3 +28,13 @@ pub fn get_thermal_energy(state: &State, first_particle: usize, count: usize, ce
         particle_thermal_energy(&particle, center_of_mass_velocity)
     }).sum()
 }
+
+pub fn get_potential_energy(state: &State, first_particle: usize, count: usize) -> f64 {
+    let slice = &state.particles[first_particle..(first_particle + count)];
+    let res: f64 = slice.into_par_iter().map(|particle| {
+        let particle = particle.lock()
+            .expect("Can't lock particle");
+        particle.potential
+    }).sum();
+    res / 2.0
+}
