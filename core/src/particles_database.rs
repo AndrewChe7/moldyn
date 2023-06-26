@@ -18,6 +18,7 @@ lazy_static!(
     static ref PARTICLE_DATA: Mutex<HashMap<u16, ParticleData>> = Mutex::new(HashMap::new());
 );
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum SaveLoadError {
     CantOpen,
@@ -98,9 +99,7 @@ impl ParticleDatabase {
             let mut particle_data_locked = PARTICLE_DATA.lock()
                 .expect("Can't lock mutex");
             for particle_data in particles_data {
-                if !particle_data_locked.contains_key(&particle_data.0) {
-                    particle_data_locked.insert(particle_data.0, particle_data.1);
-                }
+                particle_data_locked.entry(particle_data.0).or_insert(particle_data.1);
             }
         }
         Ok(())
