@@ -20,11 +20,7 @@ pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
 
     (0..number_particles).into_par_iter().for_each(|i| {
         for j in 0..i {
-            let r = {
-                let p1 = &state.particles[i].lock().expect("Can't lock particle");
-                let p2 = &state.particles[j].lock().expect("Can't lock particle");
-                p2.position - p1.position
-            };
+            let r = state.get_least_r(i, j);
             let (potential, force) = potential.get_potential_and_force(r.magnitude());
             let force_vec = r.normalize() * force;
             {

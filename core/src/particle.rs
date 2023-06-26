@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 use na::Vector3;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use crate::ParticleDatabase;
 
@@ -24,6 +25,7 @@ pub struct Particle {
 #[derive(Serialize, Deserialize)]
 pub struct State {
     pub particles: Vec<Mutex<Particle>>,
+    pub boundary_box: Vector3<f64>,
 }
 
 impl Particle {
@@ -54,5 +56,58 @@ impl Default for Particle {
             id: 0,
             mass: 0.0,
         }
+    }
+}
+
+impl State {
+    pub fn get_least_r(&self, i: usize, j: usize) -> Vector3<f64> {
+        let p1 = self.particles[i].lock().expect("Can't lock particle");
+        let p2 = self.particles[j].lock().expect("Can't lock particle");
+        let mut min_pbc = Vector3::new(-1, -1, -1);
+        let mut max_pbc = Vector3::new(1, 1, 1);
+        let bb = &self.boundary_box;
+        if p1.position.x < bb.x / 2.0 || p2.position.x > bb.x / 2.0 {
+            max_pbc.x = 0;
+        }
+        if p1.position.y < bb.y / 2.0 || p2.position.y > bb.y / 2.0 {
+            max_pbc.y = 0;
+        }
+        if p1.position.z < bb.z / 2.0 || p2.position.z > bb.z / 2.0 {
+            max_pbc.z = 0;
+        }
+        if p1.position.x > bb.x / 2.0 || p2.position.x < bb.x / 2.0 {
+            min_pbc.x = 0;
+        }
+        if p1.position.y > bb.y / 2.0 || p2.position.y < bb.y / 2.0 {
+            min_pbc.y = 0;
+        }
+        if p1.position.z > bb.z / 2.0 || p2.position.z < bb.z / 2.0 {
+            min_pbc.z = 0;
+        }
+        let mut res = p2.position - p1.position;
+        for x in min_pbc.x..(max_pbc.x+1) {
+            for y in min_pbc.y..(max_pbc.y+1) {
+                for z in min_pbc.z..(max_pbc.z+1) {
+                    let offset = Vector3::new(x as f64 * bb.x, y as f64 * bb.y, z as f64 * bb.z);
+                    let r = p2.position - (p1.position + offset);
+                    if r.magnitude_squared() < res.magnitude_squared() {
+                        res = r;
+                    }
+                }
+            }
+        }
+        res
+    }
+
+    pub fn apply_boundary_conditions(&mut self) {
+        let bb = &self.boundary_box;
+        let slice = self.particles.as_mut_slice();
+        slice.into_par_iter().for_each(|particle| {
+            let particle = particle.get_mut()
+                .expect("Can't lock particle");
+            particle.position.x = particle.position.x.rem_euclid(bb.x);
+            particle.position.y = particle.position.y.rem_euclid(bb.y);
+            particle.position.z = particle.position.z.rem_euclid(bb.z);
+        });
     }
 }

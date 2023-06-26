@@ -16,6 +16,7 @@ mod tests {
     use std::path::Path;
     use std::sync::Mutex;
     use na::Vector3;
+    use rand::Rng;
     use rayon::prelude::*;
     use crate::{ParticleDatabase, State, Particle};
 
@@ -55,6 +56,7 @@ mod tests {
 
         let state = State {
             particles: vec![Mutex::new(test_particle()), Mutex::new(test_particle())],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
 
         let serialized = ron::to_string(&state).unwrap();
@@ -113,5 +115,33 @@ mod tests {
         ParticleDatabase::load_particles_data(Path::new(&file_path))
             .expect("Something went wrong");
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
+    }
+
+    fn check_boundary_conditions (state: &State) -> bool {
+        let bb = &state.boundary_box;
+        let slice = state.particles.as_slice();
+        slice.into_par_iter().all(|particle| {
+            let particle = particle.lock()
+                .expect("Can't lock particle");
+            particle.position.x >= 0.0 && particle.position.x <= bb.x &&
+            particle.position.y >= 0.0 && particle.position.y <= bb.y &&
+            particle.position.z >= 0.0 && particle.position.z <= bb.z
+        })
+    }
+
+    #[test]
+    fn boundary_conditions_test () {
+        let mut p = Particle::default();
+        let mut rng = rand::thread_rng();
+        p.position.x = rng.gen();
+        p.position.y = rng.gen();
+        p.position.z = 3.0;
+        let mut state = State {
+            particles: vec![Mutex::new(p)],
+            boundary_box: Vector3::new(1.0, 1.0, 1.0),
+        };
+        assert!(!check_boundary_conditions(&state));
+        state.apply_boundary_conditions();
+        assert!(check_boundary_conditions(&state));
     }
 }

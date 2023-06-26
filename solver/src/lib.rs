@@ -18,7 +18,8 @@ mod tests {
 
     #[test]
     fn initialize_uniform_grid () {
-        let mut state = initializer::initialize_particles(8);
+        let mut state = initializer::initialize_particles(8,
+                                                          &Vector3::new(4.0, 4.0, 4.0));
         let res = initializer::initialize_particles_position(
             &mut state,
             0,
@@ -64,6 +65,7 @@ mod tests {
         p2.position.x = 0.5;
         let mut state = State {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
         update_force(&mut state, &lennard_jones_potential);
@@ -85,6 +87,7 @@ mod tests {
         p2.mass = 66.335;
         let mut state = State {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
         let verlet = VerletMethod;
@@ -172,6 +175,7 @@ mod tests {
         p2.mass = 66.335;
         let mut state = State {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state, &LennardJonesPotential::new(0.3418, 1.712));
         let mv = get_center_of_mass_velocity(&state, 0, 2);
