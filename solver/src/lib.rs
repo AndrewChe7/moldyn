@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate rayon;
 pub mod initializer;
 pub mod solver;
-
+pub mod macro_parameters;
 
 #[cfg(test)]
 mod tests {
@@ -12,6 +12,7 @@ mod tests {
     use na::Vector3;
     use moldyn_core::{Particle, ParticleDatabase, State};
     use crate::initializer::InitError;
+    use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_thermal_energy};
     use crate::solver::{Integrator, LennardJonesPotential, Potential, update_force, VerletMethod};
     use super::*;
 
@@ -157,5 +158,25 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
 
         }
+    }
+
+    #[test]
+    fn energies () {
+        let mut p1 = Particle::default();
+        let mut p2 = Particle::default();
+        p1.position = Vector3::new(0.75, 0.75, 0.5);
+        p2.position = Vector3::new(1.25, 0.75, 0.5);
+        p1.velocity = Vector3::new(1.0, 1.0, 0.0);
+        p2.velocity = Vector3::new(-1.0, 1.0, 0.0);
+        p1.mass = 66.335;
+        p2.mass = 66.335;
+        let state = State {
+            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+        };
+        let mv = get_center_of_mass_velocity(&state, 0, 2);
+        assert_eq!(mv,
+                   Vector3::new(0.0, 1.0, 0.0));
+        assert_eq!(format!("{:.8}", get_kinetic_energy(&state, 0, 2)), "132.67000000");
+        assert_eq!(format!("{:.8}", get_thermal_energy(&state, 0, 2, &mv)), "66.33500000");
     }
 }
