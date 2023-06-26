@@ -13,6 +13,7 @@ pub const K_B: f64 = 1.380648528;
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::sync::Mutex;
     use na::Vector3;
     use rayon::prelude::*;
@@ -94,5 +95,23 @@ mod tests {
         let _ = (0..4).into_par_iter().for_each(|i| {
             assert_eq!(ParticleDatabase::get_particle_mass(i).unwrap(), 0.1337);
         });
+    }
+
+    use tempdir::TempDir;
+
+    #[test]
+    fn save_load_particle_database_from_file () {
+        ParticleDatabase::add(0, "test_particle", 0.1);
+        assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
+        let dir = TempDir::new("test_data")
+            .expect("Can't create temp directory");
+        let file_path = dir.path().join("test.ron");
+        ParticleDatabase::save_particles_data(Path::new(&file_path))
+            .expect("Something went wrong");
+        ParticleDatabase::clear_particles();
+        assert_eq!(ParticleDatabase::get_particle_mass(0), None);
+        ParticleDatabase::load_particles_data(Path::new(&file_path))
+            .expect("Something went wrong");
+        assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
     }
 }
