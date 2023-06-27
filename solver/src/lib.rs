@@ -1,32 +1,34 @@
-extern crate rand_distr;
 extern crate moldyn_core;
 extern crate nalgebra as na;
+extern crate rand_distr;
 extern crate rayon;
 pub mod initializer;
-pub mod solver;
 pub mod macro_parameters;
+pub mod solver;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-    use na::Vector3;
-    use moldyn_core::{Particle, ParticleDatabase, State};
-    use crate::initializer::InitError;
-    use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_thermal_energy};
-    use crate::solver::{Integrator, LennardJonesPotential, Potential, update_force, VerletMethod};
     use super::*;
+    use crate::initializer::InitError;
+    use crate::macro_parameters::{
+        get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_thermal_energy,
+    };
+    use crate::solver::{update_force, Integrator, LennardJonesPotential, Potential, VerletMethod};
+    use moldyn_core::{Particle, ParticleDatabase, State};
+    use na::Vector3;
+    use std::sync::Mutex;
 
     #[test]
-    fn initialize_uniform_grid () {
-        let mut state = initializer::initialize_particles(8,
-                                                          &Vector3::new(4.0, 4.0, 4.0));
+    fn initialize_uniform_grid() {
+        let mut state = initializer::initialize_particles(8, &Vector3::new(4.0, 4.0, 4.0));
         let res = initializer::initialize_particles_position(
             &mut state,
             0,
             0,
             (0.0, 0.0, 0.0),
             (2, 2, 2),
-            2.0);
+            2.0,
+        );
         assert_eq!(res, Err(InitError::ParticleIdDidNotFound));
         ParticleDatabase::add(0, "test_particle", 1.0);
         let res = initializer::initialize_particles_position(
@@ -35,7 +37,8 @@ mod tests {
             0,
             (0.0, 0.0, 0.0),
             (3, 3, 3),
-            2.0);
+            2.0,
+        );
         assert_eq!(res, Err(InitError::TooBig));
         let res = initializer::initialize_particles_position(
             &mut state,
@@ -43,7 +46,8 @@ mod tests {
             0,
             (0.0, 0.0, 0.0),
             (2, 2, 2),
-            2.0);
+            2.0,
+        );
         assert_eq!(res, Ok(()));
         let particle = state.particles[2].lock().expect("Can't lock particle");
         assert_eq!(particle.position.x, 0.0);
@@ -52,14 +56,20 @@ mod tests {
     }
 
     #[test]
-    fn lennard_jones () {
+    fn lennard_jones() {
         let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
-        assert_eq!(format!("{:.8}", lennard_jones_potential.get_potential(0.5)), "-0.59958655");
-        assert_eq!(format!("{:.8}", lennard_jones_potential.get_force(0.5)), "6.67445797");
+        assert_eq!(
+            format!("{:.8}", lennard_jones_potential.get_potential(0.5)),
+            "-0.59958655"
+        );
+        assert_eq!(
+            format!("{:.8}", lennard_jones_potential.get_force(0.5)),
+            "6.67445797"
+        );
     }
 
     #[test]
-    fn update_force_lennard_jones () {
+    fn update_force_lennard_jones() {
         let p1 = Particle::default();
         let mut p2 = Particle::default();
         p2.position.x = 0.5;
@@ -69,14 +79,17 @@ mod tests {
         };
         let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
         update_force(&mut state, &lennard_jones_potential);
-        let force_p1 = &state.particles[0].lock().expect("Can't lock particle").force;
+        let force_p1 = &state.particles[0]
+            .lock()
+            .expect("Can't lock particle")
+            .force;
         assert_eq!(format!("{:.8}", force_p1.x), "6.67445797");
         assert_eq!(format!("{:.8}", force_p1.y), "0.00000000");
         assert_eq!(format!("{:.8}", force_p1.z), "0.00000000");
     }
 
     #[test]
-    fn verlet_with_lennard_jones () {
+    fn verlet_with_lennard_jones() {
         let mut p1 = Particle::default();
         let mut p2 = Particle::default();
         p1.position = Vector3::new(0.75, 0.75, 0.5);
@@ -159,12 +172,11 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.x), "-1.00020571");
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
-
         }
     }
 
     #[test]
-    fn energies () {
+    fn energies() {
         let mut p1 = Particle::default();
         let mut p2 = Particle::default();
         p1.position = Vector3::new(0.75, 0.75, 0.5);
@@ -179,10 +191,18 @@ mod tests {
         };
         update_force(&mut state, &LennardJonesPotential::new(0.3418, 1.712));
         let mv = get_center_of_mass_velocity(&state, 0, 2);
-        assert_eq!(mv,
-                   Vector3::new(0.0, 1.0, 0.0));
-        assert_eq!(format!("{:.8}", get_kinetic_energy(&state, 0, 2)), "132.67000000");
-        assert_eq!(format!("{:.8}", get_thermal_energy(&state, 0, 2, &mv)), "66.33500000");
-        assert_eq!(format!("{:.8}", get_potential_energy(&state, 0, 2)), "-0.59958655");
+        assert_eq!(mv, Vector3::new(0.0, 1.0, 0.0));
+        assert_eq!(
+            format!("{:.8}", get_kinetic_energy(&state, 0, 2)),
+            "132.67000000"
+        );
+        assert_eq!(
+            format!("{:.8}", get_thermal_energy(&state, 0, 2, &mv)),
+            "66.33500000"
+        );
+        assert_eq!(
+            format!("{:.8}", get_potential_energy(&state, 0, 2)),
+            "-0.59958655"
+        );
     }
 }

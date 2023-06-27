@@ -1,8 +1,8 @@
-use std::sync::Mutex;
+use crate::ParticleDatabase;
 use na::Vector3;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::ParticleDatabase;
+use std::sync::Mutex;
 
 /// Structure that keeps all data for particle
 #[derive(Serialize, Deserialize)]
@@ -30,15 +30,13 @@ pub struct State {
 
 impl Particle {
     /// Create empty particle
-    pub fn new(particle_id: u16,
-               position: Vector3<f64>,
-               velocity: Vector3<f64>) -> Option<Self> {
+    pub fn new(particle_id: u16, position: Vector3<f64>, velocity: Vector3<f64>) -> Option<Self> {
         ParticleDatabase::get_particle_mass(particle_id)?;
         let mass = ParticleDatabase::get_particle_mass(particle_id).unwrap();
         Some(Particle {
             position,
             velocity,
-            force: Vector3::new(0.0,0.0,0.0),
+            force: Vector3::new(0.0, 0.0, 0.0),
             potential: 0.0,
             id: particle_id,
             mass,
@@ -49,9 +47,9 @@ impl Particle {
 impl Default for Particle {
     fn default() -> Self {
         Particle {
-            position: Vector3::new(0.0,0.0,0.0),
-            velocity: Vector3::new(0.0,0.0,0.0),
-            force: Vector3::new(0.0,0.0,0.0),
+            position: Vector3::new(0.0, 0.0, 0.0),
+            velocity: Vector3::new(0.0, 0.0, 0.0),
+            force: Vector3::new(0.0, 0.0, 0.0),
             potential: 0.0,
             id: 0,
             mass: 0.0,
@@ -85,9 +83,9 @@ impl State {
             min_pbc.z = 0;
         }
         let mut res = p2.position - p1.position;
-        for x in min_pbc.x..(max_pbc.x+1) {
-            for y in min_pbc.y..(max_pbc.y+1) {
-                for z in min_pbc.z..(max_pbc.z+1) {
+        for x in min_pbc.x..(max_pbc.x + 1) {
+            for y in min_pbc.y..(max_pbc.y + 1) {
+                for z in min_pbc.z..(max_pbc.z + 1) {
                     let offset = Vector3::new(x as f64 * bb.x, y as f64 * bb.y, z as f64 * bb.z);
                     let r = p2.position - (p1.position + offset);
                     if r.magnitude_squared() < res.magnitude_squared() {
@@ -103,8 +101,7 @@ impl State {
         let bb = &self.boundary_box;
         let slice = self.particles.as_mut_slice();
         slice.into_par_iter().for_each(|particle| {
-            let particle = particle.get_mut()
-                .expect("Can't lock particle");
+            let particle = particle.get_mut().expect("Can't lock particle");
             particle.position.x = particle.position.x.rem_euclid(bb.x);
             particle.position.y = particle.position.y.rem_euclid(bb.y);
             particle.position.z = particle.position.z.rem_euclid(bb.z);

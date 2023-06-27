@@ -1,6 +1,6 @@
-use rayon::prelude::*;
+use crate::solver::{update_force, Integrator, Potential};
 use moldyn_core::State;
-use crate::solver::{Integrator, Potential, update_force};
+use rayon::prelude::*;
 
 pub struct VerletMethod;
 
@@ -9,8 +9,8 @@ impl Integrator for VerletMethod {
         state.particles.par_iter_mut().for_each(|particle| {
             let particle = particle.get_mut().expect("Can't lock particle");
             let acceleration = particle.force / particle.mass;
-            particle.position += particle.velocity * delta_time +
-                acceleration * delta_time * delta_time / 2.0;
+            particle.position +=
+                particle.velocity * delta_time + acceleration * delta_time * delta_time / 2.0;
             particle.velocity += acceleration * delta_time / 2.0;
         });
         update_force(state, potential);

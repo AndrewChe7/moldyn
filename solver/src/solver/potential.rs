@@ -1,13 +1,13 @@
-use rayon::prelude::*;
 use moldyn_core::State;
+use rayon::prelude::*;
 
 pub trait Potential: Sync + Send {
-    fn get_potential (&self, r: f64) -> f64;
-    fn get_force (&self, r: f64) -> f64;
-    fn get_potential_and_force (&self, r: f64) -> (f64, f64);
+    fn get_potential(&self, r: f64) -> f64;
+    fn get_force(&self, r: f64) -> f64;
+    fn get_potential_and_force(&self, r: f64) -> (f64, f64);
 }
 
-pub fn update_force <T: Potential > (state: &mut State, potential: &T) {
+pub fn update_force<T: Potential>(state: &mut State, potential: &T) {
     let number_particles = state.particles.len();
 
     state.particles.par_iter_mut().for_each(|particle| {

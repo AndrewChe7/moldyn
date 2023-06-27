@@ -1,9 +1,9 @@
 mod particle;
 mod particles_database;
-extern crate nalgebra as na;
-extern crate serde;
 extern crate lazy_static;
+extern crate nalgebra as na;
 extern crate rayon;
+extern crate serde;
 
 pub use particle::Particle;
 pub use particle::State;
@@ -13,12 +13,12 @@ pub const K_B: f64 = 1.380648528;
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use std::sync::Mutex;
+    use crate::{Particle, ParticleDatabase, State};
     use na::Vector3;
     use rand::Rng;
     use rayon::prelude::*;
-    use crate::{ParticleDatabase, State, Particle};
+    use std::path::Path;
+    use std::sync::Mutex;
 
     fn test_particle() -> Particle {
         Particle {
@@ -41,7 +41,7 @@ mod tests {
     }
 
     #[test]
-    fn particle_serialization () {
+    fn particle_serialization() {
         let particle = test_particle();
 
         let serialized = ron::to_string(&particle).unwrap();
@@ -51,7 +51,7 @@ mod tests {
     }
 
     #[test]
-    fn state_serialization () {
+    fn state_serialization() {
         let particle = test_particle();
 
         let state = State {
@@ -69,7 +69,7 @@ mod tests {
     }
 
     #[test]
-    fn particle_database () {
+    fn particle_database() {
         ParticleDatabase::add(0, "test_particle", 0.1337);
         ParticleDatabase::add(1, "test_particle2", 0.273);
         ParticleDatabase::add(2, "test_particle3", 0.272);
@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn particle_database_multithreaded () {
+    fn particle_database_multithreaded() {
         let _ = (0..4).into_par_iter().for_each(|i| {
             ParticleDatabase::add(i, "test_particle", 0.1337);
         });
@@ -102,35 +102,34 @@ mod tests {
     use tempdir::TempDir;
 
     #[test]
-    fn save_load_particle_database_from_file () {
+    fn save_load_particle_database_from_file() {
         ParticleDatabase::add(0, "test_particle", 0.1);
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
-        let dir = TempDir::new("test_data")
-            .expect("Can't create temp directory");
+        let dir = TempDir::new("test_data").expect("Can't create temp directory");
         let file_path = dir.path().join("test.ron");
-        ParticleDatabase::save_particles_data(Path::new(&file_path))
-            .expect("Something went wrong");
+        ParticleDatabase::save_particles_data(Path::new(&file_path)).expect("Something went wrong");
         ParticleDatabase::clear_particles();
         assert_eq!(ParticleDatabase::get_particle_mass(0), None);
-        ParticleDatabase::load_particles_data(Path::new(&file_path))
-            .expect("Something went wrong");
+        ParticleDatabase::load_particles_data(Path::new(&file_path)).expect("Something went wrong");
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
     }
 
-    fn check_boundary_conditions (state: &State) -> bool {
+    fn check_boundary_conditions(state: &State) -> bool {
         let bb = &state.boundary_box;
         let slice = state.particles.as_slice();
         slice.into_par_iter().all(|particle| {
-            let particle = particle.lock()
-                .expect("Can't lock particle");
-            particle.position.x >= 0.0 && particle.position.x <= bb.x &&
-            particle.position.y >= 0.0 && particle.position.y <= bb.y &&
-            particle.position.z >= 0.0 && particle.position.z <= bb.z
+            let particle = particle.lock().expect("Can't lock particle");
+            particle.position.x >= 0.0
+                && particle.position.x <= bb.x
+                && particle.position.y >= 0.0
+                && particle.position.y <= bb.y
+                && particle.position.z >= 0.0
+                && particle.position.z <= bb.z
         })
     }
 
     #[test]
-    fn boundary_conditions_test () {
+    fn boundary_conditions_test() {
         let mut p = Particle::default();
         let mut rng = rand::thread_rng();
         p.position.x = rng.gen();
