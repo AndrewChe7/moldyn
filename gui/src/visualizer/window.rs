@@ -6,6 +6,46 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
+// use crate::visualizer::camera::Camera;
+
+use bytemuck::Pod;
+use bytemuck::Zeroable;
+use wgpu::util::DeviceExt;
+use moldyn_core::Particle;
+
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
+struct ParticleData {
+    position: [f64; 3],
+    velocity: [f64; 3],
+    force: [f64; 3],
+    potential: f64,
+    mass: f64,
+    id: u32,
+    _padding: u32,
+}
+
+fn particle_data_from_particle(particle: &Particle) -> ParticleData {
+    ParticleData {
+        position: particle.position.as_slice().try_into().expect("Something went wrong"),
+        velocity: particle.velocity.as_slice().try_into().expect("Something went wrong"),
+        force: particle.force.as_slice().try_into().expect("Something went wrong"),
+        potential: particle.potential,
+        mass: particle.mass,
+        id: particle.id as u32,
+        _padding: 0,
+    }
+}
+
+fn particle_data_vector_from_state(state: &moldyn_core::State) -> Vec<ParticleData> {
+    let mut res = vec![];
+    for particle in &state.particles {
+        let particle = particle.lock().expect("Cann't lock particle");
+        let particle_data = particle_data_from_particle(&particle);
+        res.push(particle_data);
+    }
+    res
+}
 
 struct State {
     surface: wgpu::Surface,
@@ -14,6 +54,12 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     window: Window,
+    screen_texture: wgpu::Texture,
+    particles_buffer: wgpu::Buffer,
+    compute_pipeline: wgpu::ComputePipeline,
+    render_to_screen_pipeline: wgpu::RenderPipeline,
+    screen_bind_group: wgpu::BindGroup,
+    compute_bind_group: wgpu::BindGroup,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -102,51 +148,135 @@ pub async fn visualizer_window() {
     });
 }
 
+fn create_compute_pipeline (device: &wgpu::Device,
+                            _config: &wgpu::SurfaceConfiguration,
+                            shader: &wgpu::ShaderModule,
+                            compute_bind_group_layout: &wgpu::BindGroupLayout) -> wgpu::ComputePipeline {
+    let compute_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Compute renderer Pipeline Layout"),
+            bind_group_layouts: &[compute_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some("MainRenderer"),
+        layout: Some(&compute_pipeline_layout),
+        module: &shader,
+        entry_point: "main",
+    });
+    pipeline
+}
+
+fn create_render_pipeline (device: &wgpu::Device,
+                           config: &wgpu::SurfaceConfiguration,
+                           shader: &wgpu::ShaderModule,
+                           texture_bind_group_layout: &wgpu::BindGroupLayout) -> wgpu::RenderPipeline {
+    let render_pipeline_layout =
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[texture_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Render Pipeline"),
+        layout: Some(&render_pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: "vs_main",
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: "fs_main",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: config.format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: Some(wgpu::Face::Back),
+            // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+            polygon_mode: wgpu::PolygonMode::Fill,
+            // Requires Features::DEPTH_CLIP_CONTROL
+            unclipped_depth: false,
+            // Requires Features::CONSERVATIVE_RASTERIZATION
+            conservative: false,
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview: None,
+    });
+    render_pipeline
+}
+
+fn create_pipelines(device: &wgpu::Device,
+                    config: &wgpu::SurfaceConfiguration,
+                    texture_bind_group_layout: &wgpu::BindGroupLayout,
+                    compute_bind_group_layout: &wgpu::BindGroupLayout) -> (wgpu::ComputePipeline, wgpu::RenderPipeline) {
+    let render_shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+    let compute_shader = device.create_shader_module(wgpu::include_wgsl!("render_particles.wgsl"));
+    let compute_pipeline = create_compute_pipeline(device, config, &compute_shader, compute_bind_group_layout);
+    let render_pipeline = create_render_pipeline(device, config, &render_shader, texture_bind_group_layout);
+    (compute_pipeline, render_pipeline)
+}
+
+async fn create_base_objects (window: &Window)
+            -> (wgpu::Surface, wgpu::Adapter, wgpu::Device, wgpu::Queue) {
+    // The instance is a handle to our GPU
+    // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::all(),
+        dx12_shader_compiler: Default::default(),
+    });
+
+    // # Safety
+    //
+    // The surface needs to live as long as the window that created it.
+    // State owns the window so this should be safe.
+    let surface = unsafe { instance.create_surface(&window) }.unwrap();
+
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        })
+        .await
+        .unwrap();
+
+    let (device, queue) = adapter
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                features: wgpu::Features::SHADER_F64,
+                // WebGL doesn't support all of wgpu's features, so if
+                // we're building for the web we'll have to disable some.
+                limits: if cfg!(target_arch = "wasm32") {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                } else {
+                    wgpu::Limits::default()
+                },
+                label: None,
+            },
+            None, // Trace path
+        )
+        .await
+        .unwrap();
+    (surface, adapter, device, queue)
+}
+
 impl State {
     // Creating some of the wgpu types requires async code
     async fn new(window: Window) -> Self {
         let size = window.inner_size();
-
-        // The instance is a handle to our GPU
-        // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            dx12_shader_compiler: Default::default(),
-        });
-
-        // # Safety
-        //
-        // The surface needs to live as long as the window that created it.
-        // State owns the window so this should be safe.
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
-
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .unwrap();
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    // WebGL doesn't support all of wgpu's features, so if
-                    // we're building for the web we'll have to disable some.
-                    limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits::default()
-                    },
-                    label: None,
-                },
-                None, // Trace path
-            )
-            .await
-            .unwrap();
-
+        let (surface, adapter, device, queue) = create_base_objects(&window).await;
         let surface_caps = surface.get_capabilities(&adapter);
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
         // one will result all the colors coming out darker. If you want to support non
@@ -167,14 +297,142 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        Self {
+        let screen_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("screen_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::STORAGE_BINDING,
+            view_formats: &[],
+        });
+        let screen_texture_view = screen_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let screen_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        let screen_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        // This should match the filterable field of the
+                        // corresponding Texture entry above.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_layout"),
+            });
+        let compute_bind_group_layout = device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                label: Some("compute_bind_group_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    }
+                ],
+            });
+        let screen_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &screen_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&screen_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&screen_sampler),
+                    }
+                ],
+                label: Some("screen_bind_group"),
+            }
+        );
+        let particles_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("particles_buffer"),
+                size: (std::mem::size_of::<ParticleData>() * 1000000) as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+        let compute_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &compute_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: particles_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&screen_texture_view)
+                    }
+                ],
+                label: Some("compute_bind_group"),
+            }
+        );
+        let (compute_pipeline, render_to_screen_pipeline) = create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
+        let mut res = Self {
             surface,
             device,
             queue,
             config,
             size,
             window,
-        }
+            screen_texture,
+            particles_buffer,
+            compute_pipeline,
+            render_to_screen_pipeline,
+            screen_bind_group,
+            compute_bind_group,
+        };
+        let particles_state = moldyn_core::State::default();
+        res.load_state_to_buffer(&particles_state);
+        res
     }
 
     pub fn window(&self) -> &Window {
@@ -194,6 +452,24 @@ impl State {
         false
     }
 
+    fn load_state_to_buffer (&mut self, state: &moldyn_core::State) {
+        let load_buffer = particle_data_vector_from_state(state);
+        let source_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("State data load buffer"),
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC,
+            contents: bytemuck::cast_slice(&load_buffer),
+        });
+        let mut command_encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+            label: Some("Loader")
+        });
+        command_encoder.copy_buffer_to_buffer(&source_buffer, 0,
+                                              &self.particles_buffer, 0,
+                                              source_buffer.size());
+        self.queue.submit(Some(command_encoder.finish()));
+    }
+
     fn update(&mut self) {}
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -206,8 +482,18 @@ impl State {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
-        {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        { // Rendering particles to screen quad
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("MainRenderer Pass"),
+            });
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            let x = self.config.width;
+            let y = self.config.height;
+            compute_pass.dispatch_workgroups(x, y, 1);
+        }
+        { // Rendering screen quad
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -224,6 +510,9 @@ impl State {
                 })],
                 depth_stencil_attachment: None,
             });
+            render_pass.set_pipeline(&self.render_to_screen_pipeline);
+            render_pass.set_bind_group(0, &self.screen_bind_group, &[]);
+            render_pass.draw(0..6, 0..1);
         }
 
         // submit will accept anything that implements IntoIter

@@ -108,3 +108,13 @@ impl State {
         });
     }
 }
+
+impl Default for State {
+    fn default() -> Self {
+        let p = Particle::default();
+        State {
+            particles: vec![Mutex::new(p)],
+            boundary_box: Vector3::new(1.0, 1.0, 1.0),
+        }
+    }
+}
