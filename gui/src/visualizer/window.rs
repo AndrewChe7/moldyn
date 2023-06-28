@@ -6,12 +6,20 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
 };
-// use crate::visualizer::camera::Camera;
+
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
+const MAX_PARTICLES: usize = 1000;
 
 use bytemuck::Pod;
 use bytemuck::Zeroable;
+use egui::FontDefinitions;
+use egui_wgpu_backend::ScreenDescriptor;
+use egui_winit_platform::{Platform, PlatformDescriptor};
 use wgpu::util::DeviceExt;
+use winit::dpi::PhysicalSize;
 use moldyn_core::Particle;
+use crate::visualizer::camera::Camera;
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
@@ -25,6 +33,23 @@ struct ParticleData {
     _padding: u32,
 }
 
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone, Pod, Zeroable)]
+pub struct CameraData {
+    eye: [f32; 3],
+    _pad0: f32,
+    fovx: f32,
+    forward: [f32; 3],
+    _pad1: f32,
+    right: [f32; 3],
+    _pad2: f32,
+    up: [f32; 3],
+    _pad3: f32,
+    width: u32,
+    height: u32,
+    _padding: u32,
+}
+
 fn particle_data_from_particle(particle: &Particle) -> ParticleData {
     ParticleData {
         position: particle.position.as_slice().try_into().expect("Something went wrong"),
@@ -33,6 +58,23 @@ fn particle_data_from_particle(particle: &Particle) -> ParticleData {
         potential: particle.potential,
         mass: particle.mass,
         id: particle.id as u32,
+        _padding: 0,
+    }
+}
+
+fn camera_data_from_camera(camera: &Camera) -> CameraData {
+    CameraData {
+        eye: [camera.eye.x, camera.eye.y, camera.eye.z],
+        fovx: camera.fovx,
+        forward: [camera.forward.x, camera.forward.y, camera.forward.z],
+        right: [camera.right.x, camera.right.y, camera.right.z],
+        up: [camera.up.x, camera.up.y, camera.up.z],
+        width: camera.width,
+        height: camera.height,
+        _pad0: 0.0,
+        _pad1: 0.0,
+        _pad2: 0.0,
+        _pad3: 0.0,
         _padding: 0,
     }
 }
@@ -52,14 +94,20 @@ struct State {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
+    size: PhysicalSize<u32>,
     window: Window,
-    screen_texture: wgpu::Texture,
+    _screen_texture: wgpu::Texture,
     particles_buffer: wgpu::Buffer,
+    camera_buffer: wgpu::Buffer,
+    camera: Camera,
     compute_pipeline: wgpu::ComputePipeline,
     render_to_screen_pipeline: wgpu::RenderPipeline,
     screen_bind_group: wgpu::BindGroup,
     compute_bind_group: wgpu::BindGroup,
+    particle_count: u32,
+    platform: Platform,
+    egui_rpass: egui_wgpu_backend::RenderPass,
+    egui_demo: egui_demo_lib::DemoWindows,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -74,7 +122,9 @@ pub async fn visualizer_window() {
     }
 
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
+        .build(&event_loop).unwrap();
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -98,6 +148,7 @@ pub async fn visualizer_window() {
     let mut state = State::new(window).await;
 
     event_loop.run(move |event, _, control_flow| {
+        state.imgui_event(&event);
         match event {
             Event::WindowEvent {
                 ref event,
@@ -355,7 +406,7 @@ impl State {
                         binding: 0,
                         visibility: wgpu::ShaderStages::COMPUTE,
                         ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
@@ -370,7 +421,17 @@ impl State {
                             view_dimension: wgpu::TextureViewDimension::D2,
                         },
                         count: None,
-                    }
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ],
             });
         let screen_bind_group = device.create_bind_group(
@@ -392,13 +453,33 @@ impl State {
         let particles_buffer = device.create_buffer(
             &wgpu::BufferDescriptor {
                 label: Some("particles_buffer"),
-                size: (std::mem::size_of::<ParticleData>() * 1000000) as wgpu::BufferAddress,
+                size: (std::mem::size_of::<ParticleData>() * MAX_PARTICLES) as wgpu::BufferAddress,
                 usage: wgpu::BufferUsages::STORAGE
                     | wgpu::BufferUsages::COPY_SRC
                     | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }
         );
+        let camera_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("camera_buffer"),
+                size: std::mem::size_of::<CameraData>() as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::UNIFORM
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+        let platform = Platform::new(PlatformDescriptor {
+            physical_width: size.width,
+            physical_height: size.height,
+            scale_factor: window.scale_factor(),
+            font_definitions: FontDefinitions::default(),
+            style: Default::default(),
+        });
+        // We use the egui_wgpu_backend crate as the render backend.
+        let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
+        let egui_demo = egui_demo_lib::DemoWindows::default();
         let compute_bind_group = device.create_bind_group(
             &wgpu::BindGroupDescriptor {
                 layout: &compute_bind_group_layout,
@@ -410,12 +491,17 @@ impl State {
                     wgpu::BindGroupEntry {
                         binding: 1,
                         resource: wgpu::BindingResource::TextureView(&screen_texture_view)
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: camera_buffer.as_entire_binding(),
                     }
                 ],
                 label: Some("compute_bind_group"),
             }
         );
         let (compute_pipeline, render_to_screen_pipeline) = create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
+        let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (size.width, size.height));
         let mut res = Self {
             surface,
             device,
@@ -423,15 +509,22 @@ impl State {
             config,
             size,
             window,
-            screen_texture,
+            _screen_texture: screen_texture,
             particles_buffer,
+            camera_buffer,
+            camera,
             compute_pipeline,
             render_to_screen_pipeline,
             screen_bind_group,
             compute_bind_group,
+            particle_count: 0,
+            platform,
+            egui_rpass,
+            egui_demo,
         };
         let particles_state = moldyn_core::State::default();
         res.load_state_to_buffer(&particles_state);
+        res.load_camera_to_buffer();
         res
     }
 
@@ -439,7 +532,11 @@ impl State {
         &self.window
     }
 
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn imgui_event(&mut self, event: &Event<()>) {
+        self.platform.handle_event(&event);
+    }
+
+    fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
             self.config.width = new_size.width;
@@ -448,12 +545,13 @@ impl State {
         }
     }
 
-    fn input(&mut self, _event: &WindowEvent) -> bool {
+    fn input(&mut self, event: &WindowEvent) -> bool {
         false
     }
 
     fn load_state_to_buffer (&mut self, state: &moldyn_core::State) {
         let load_buffer = particle_data_vector_from_state(state);
+        self.particle_count = state.particles.len() as u32;
         let source_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("State data load buffer"),
             usage: wgpu::BufferUsages::STORAGE
@@ -468,6 +566,25 @@ impl State {
                                               &self.particles_buffer, 0,
                                               source_buffer.size());
         self.queue.submit(Some(command_encoder.finish()));
+        source_buffer.destroy();
+    }
+
+    fn load_camera_to_buffer(&mut self) {
+        let load_buffer = camera_data_from_camera(&self.camera);
+        let source_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera data load buffer"),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC,
+            contents: bytemuck::cast_slice(&[load_buffer]),
+        });
+        let mut command_encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Loader")
+            });
+        command_encoder.copy_buffer_to_buffer(&source_buffer, 0,
+                                              &self.camera_buffer, 0,
+                                              source_buffer.size());
+        self.queue.submit(Some(command_encoder.finish()));
+        source_buffer.destroy();
     }
 
     fn update(&mut self) {}
@@ -490,7 +607,7 @@ impl State {
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
             let x = self.config.width;
             let y = self.config.height;
-            compute_pass.dispatch_workgroups(x, y, 1);
+            compute_pass.dispatch_workgroups(x, y, self.particle_count);
         }
         { // Rendering screen quad
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -514,11 +631,43 @@ impl State {
             render_pass.set_bind_group(0, &self.screen_bind_group, &[]);
             render_pass.draw(0..6, 0..1);
         }
+        {
+            self.platform.begin_frame();
+            /////
+            self.egui_demo.ui(&self.platform.context());
+            ////
+            // End the UI frame. We could now handle the output and draw the UI with the backend.
+            let full_output = self.platform.end_frame(Some(&self.window));
+            let paint_jobs = self.platform.context().tessellate(full_output.shapes);
+
+            // Upload all resources for the GPU.
+            let screen_descriptor = ScreenDescriptor {
+                physical_width: self.config.width,
+                physical_height: self.config.height,
+                scale_factor: self.window.scale_factor() as f32,
+            };
+            let tdelta: egui::TexturesDelta = full_output.textures_delta;
+            self.egui_rpass
+                .add_textures(&self.device, &self.queue, &tdelta)
+                .expect("Something went wrong");
+            self.egui_rpass.update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+
+            // Record all render passes.
+            self.egui_rpass
+                .execute(
+                    &mut encoder,
+                    &view,
+                    &paint_jobs,
+                    &screen_descriptor,
+                    None,
+                )
+                .unwrap();
+
+        }
 
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
-
         Ok(())
     }
 }

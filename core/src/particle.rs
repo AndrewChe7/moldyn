@@ -52,7 +52,7 @@ impl Default for Particle {
             force: Vector3::new(0.0, 0.0, 0.0),
             potential: 0.0,
             id: 0,
-            mass: 0.0,
+            mass: 1.0,
         }
     }
 }

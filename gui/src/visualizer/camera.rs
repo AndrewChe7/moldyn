@@ -1,41 +1,62 @@
-// #[rustfmt::skip]
-// pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-//     1.0, 0.0, 0.0, 0.0,
-//     0.0, 1.0, 0.0, 0.0,
-//     0.0, 0.0, 0.5, 0.0,
-//     0.0, 0.0, 0.5, 1.0,
-// );
-//
-// pub struct Camera {
-//     eye: cgmath::Point3<f32>,
-//     target: cgmath::Point3<f32>,
-//     up: cgmath::Vector3<f32>,
-//     aspect: f32,
-//     fovy: f32,
-//     znear: f32,
-//     zfar: f32,
-// }
-//
-// impl Camera {
-//     pub fn new(eye: (f32, f32, f32), target: (f32, f32, f32), aspect: f32) -> Self {
-//         Camera {
-//             // position the camera one unit up and 2 units back
-//             // +z is out of the screen
-//             eye: eye.into(),
-//             // have it look at the origin
-//             target: target.into(),
-//             // which way is "up"
-//             up: cgmath::Vector3::unit_y(),
-//             aspect,
-//             fovy: 45.0,
-//             znear: 0.1,
-//             zfar: 100.0,
-//         }
-//     }
-//
-//     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-//         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-//         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-//         return OPENGL_TO_WGPU_MATRIX * proj * view;
-//     }
-// }
+use cgmath::InnerSpace;
+
+pub struct Camera {
+    pub eye: cgmath::Point3<f32>,
+    pub fovx: f32,
+    pub forward: cgmath::Vector3<f32>,
+    pub right: cgmath::Vector3<f32>,
+    pub up: cgmath::Vector3<f32>,
+    pub width: u32,
+    pub height: u32,
+}
+
+fn get_right_up(forward: &cgmath::Vector3<f32>, fovx: f32, width: u32, height: u32)
+    -> (cgmath::Vector3<f32>, cgmath::Vector3<f32>) {
+    let world_up = cgmath::Vector3::new(0.0, 1.0, 0.0);
+    let mut right = forward.cross(world_up).normalize();
+    let mut up = forward.cross(right).normalize();
+    let angle_right = fovx.to_radians() / 2.0;
+    let angle_up = angle_right / width as f32 * height as f32;
+    let right_length = angle_right.tan();
+    let up_length = angle_up.tan();
+    up *= up_length;
+    right *= right_length;
+    (right, up)
+}
+
+impl Camera {
+    pub fn new(eye: (f32, f32, f32), fovx: f32, screen_size: (u32, u32)) -> Self {
+        let forward = cgmath::Vector3::new(1.0, 0.0, 0.0);
+        let (right, up) = get_right_up(&forward, fovx, screen_size.0, screen_size.1);
+        Self {
+            eye: cgmath::Point3::new(eye.0, eye.1, eye.2),
+            fovx,
+            forward,
+            right,
+            up,
+            width: screen_size.0,
+            height: screen_size.1,
+        }
+    }
+
+    pub fn _update_position(&mut self, dx: f32, dy: f32, width: u32, height: u32) {
+        let (right, up) = get_right_up(&self.forward, self.fovx, width, height);
+        self.eye += self.forward * dy + self.right * dx;
+        self.right = right;
+        self.up = up;
+        self.width = width;
+        self.height = height;
+    }
+
+    pub fn _update_angle(&mut self, dx: f32, dy: f32, width: u32, height: u32) {
+        let forward = self.forward + self.right * dx + self.up * dy;
+        let forward = forward.normalize();
+        let (right, up) = get_right_up(&forward, self.fovx, width, height);
+        self.forward = forward;
+        self.right = right;
+        self.up = up;
+        self.width = width;
+        self.height = height;
+    }
+
+}
