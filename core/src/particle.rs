@@ -111,10 +111,19 @@ impl State {
 
 impl Default for State {
     fn default() -> Self {
-        let p = Particle::default();
+        ParticleDatabase::add(0, "test_particle", 1.0);
+        ParticleDatabase::add(1, "test_particle1", 3.0);
+        let p1 = Particle::new(0,
+                               Vector3::new(0.0, 0.0, 0.0),
+                               Vector3::new(0.0, 0.0, 0.0))
+            .expect("Can't create particle");
+        let p2 = Particle::new(1,
+                               Vector3::new(0.0, 0.5, 0.0),
+                               Vector3::new(0.0, 0.0, 0.0))
+            .expect("Can't create particle");
         State {
-            particles: vec![Mutex::new(p)],
-            boundary_box: Vector3::new(1.0, 1.0, 1.0),
+            particles: vec![Mutex::new(p2), Mutex::new(p1)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
         }
     }
 }

@@ -24,27 +24,20 @@ use crate::visualizer::camera::Camera;
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct ParticleData {
-    position: [f64; 3],
-    velocity: [f64; 3],
-    force: [f64; 3],
-    potential: f64,
-    mass: f64,
-    id: u32,
-    _padding: u32,
+    position: [f64; 4],
+    velocity: [f64; 4],
+    force: [f64; 4],
+    potential_mass_id: [f64; 4],
 }
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub struct CameraData {
-    eye: [f32; 3],
-    _pad0: f32,
+    eye: [f32; 4],
+    forward: [f32; 4],
+    right: [f32; 4],
+    up: [f32; 4],
     fovx: f32,
-    forward: [f32; 3],
-    _pad1: f32,
-    right: [f32; 3],
-    _pad2: f32,
-    up: [f32; 3],
-    _pad3: f32,
     width: u32,
     height: u32,
     _padding: u32,
@@ -52,29 +45,22 @@ pub struct CameraData {
 
 fn particle_data_from_particle(particle: &Particle) -> ParticleData {
     ParticleData {
-        position: particle.position.as_slice().try_into().expect("Something went wrong"),
-        velocity: particle.velocity.as_slice().try_into().expect("Something went wrong"),
-        force: particle.force.as_slice().try_into().expect("Something went wrong"),
-        potential: particle.potential,
-        mass: particle.mass,
-        id: particle.id as u32,
-        _padding: 0,
+        position: [particle.position.x, particle.position.y, particle.position.z, 1.0],
+        velocity: [particle.velocity.x, particle.velocity.y, particle.velocity.z, 0.0],
+        force: [particle.force.x, particle.force.y, particle.force.z, 0.0],
+        potential_mass_id: [particle.potential, particle.mass, particle.id as f64, 0.0],
     }
 }
 
 fn camera_data_from_camera(camera: &Camera) -> CameraData {
     CameraData {
-        eye: [camera.eye.x, camera.eye.y, camera.eye.z],
+        eye: [camera.eye.x, camera.eye.y, camera.eye.z, 1.0],
+        forward: [camera.forward.x, camera.forward.y, camera.forward.z, 0.0],
+        right: [camera.right.x, camera.right.y, camera.right.z, 0.0],
+        up: [camera.up.x, camera.up.y, camera.up.z, 0.0],
         fovx: camera.fovx,
-        forward: [camera.forward.x, camera.forward.y, camera.forward.z],
-        right: [camera.right.x, camera.right.y, camera.right.z],
-        up: [camera.up.x, camera.up.y, camera.up.z],
         width: camera.width,
         height: camera.height,
-        _pad0: 0.0,
-        _pad1: 0.0,
-        _pad2: 0.0,
-        _pad3: 0.0,
         _padding: 0,
     }
 }
@@ -545,7 +531,7 @@ impl State {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, _event: &WindowEvent) -> bool {
         false
     }
 
@@ -582,7 +568,7 @@ impl State {
             });
         command_encoder.copy_buffer_to_buffer(&source_buffer, 0,
                                               &self.camera_buffer, 0,
-                                              source_buffer.size());
+                                              std::mem::size_of::<CameraData>() as wgpu::BufferAddress);
         self.queue.submit(Some(command_encoder.finish()));
         source_buffer.destroy();
     }
@@ -669,5 +655,68 @@ impl State {
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::Vector3;
+    use moldyn_core::{Particle, ParticleDatabase, State};
+    use crate::visualizer::window::{particle_data_from_particle, particle_data_vector_from_state};
+
+    #[test]
+    fn particle_data_converter () {
+        ParticleDatabase::add(0, "test_particle", 1.0);
+        let particle = Particle::new(0,
+                                     Vector3::new(1.0, 2.0, 3.0),
+                                     Vector3::new(4.0, 5.0, 6.0)).expect("Can't create particle");
+        let pd = particle_data_from_particle(&particle);
+        assert_eq!(pd.mass, 1.0);
+        assert_eq!(pd.id, 0);
+        assert_eq!(pd.position[0], 1.0);
+        assert_eq!(pd.position[1], 2.0);
+        assert_eq!(pd.position[2], 3.0);
+        assert_eq!(pd.velocity[0], 4.0);
+        assert_eq!(pd.velocity[1], 5.0);
+        assert_eq!(pd.velocity[2], 6.0);
+    }
+
+    #[test]
+    fn particle_data_converter_default () {
+        let particle = Particle::default();
+        let pd = particle_data_from_particle(&particle);
+        assert_eq!(pd.mass, 1.0);
+        assert_eq!(pd.id, 0);
+        assert_eq!(pd.position[0], 0.0);
+        assert_eq!(pd.position[1], 0.0);
+        assert_eq!(pd.position[2], 0.0);
+        assert_eq!(pd.velocity[0], 0.0);
+        assert_eq!(pd.velocity[1], 0.0);
+        assert_eq!(pd.velocity[2], 0.0);
+    }
+
+    #[test]
+    fn particle_state_converter () {
+        let state = State::default();
+        let state_data = particle_data_vector_from_state(&state);
+        assert_eq!(state_data.len(), 2);
+        let pd = &state_data[0];
+        assert_eq!(pd.mass, 1.0);
+        assert_eq!(pd.id, 0);
+        assert_eq!(pd.position[0], 0.0);
+        assert_eq!(pd.position[1], 0.0);
+        assert_eq!(pd.position[2], 0.0);
+        assert_eq!(pd.velocity[0], 0.0);
+        assert_eq!(pd.velocity[1], 0.0);
+        assert_eq!(pd.velocity[2], 0.0);
+        let pd = &state_data[1];
+        assert_eq!(pd.mass, 3.0);
+        assert_eq!(pd.id, 1);
+        assert_eq!(pd.position[0], 1.0);
+        assert_eq!(pd.position[1], 0.0);
+        assert_eq!(pd.position[2], 0.0);
+        assert_eq!(pd.velocity[0], 0.0);
+        assert_eq!(pd.velocity[1], 0.0);
+        assert_eq!(pd.velocity[2], 0.0);
     }
 }
