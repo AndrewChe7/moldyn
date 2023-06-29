@@ -671,8 +671,8 @@ mod tests {
                                      Vector3::new(1.0, 2.0, 3.0),
                                      Vector3::new(4.0, 5.0, 6.0)).expect("Can't create particle");
         let pd = particle_data_from_particle(&particle);
-        assert_eq!(pd.mass, 1.0);
-        assert_eq!(pd.id, 0);
+        assert_eq!(pd.potential_mass_id[1], 1.0);
+        assert_eq!(pd.potential_mass_id[2], 0.0);
         assert_eq!(pd.position[0], 1.0);
         assert_eq!(pd.position[1], 2.0);
         assert_eq!(pd.position[2], 3.0);
@@ -685,8 +685,8 @@ mod tests {
     fn particle_data_converter_default () {
         let particle = Particle::default();
         let pd = particle_data_from_particle(&particle);
-        assert_eq!(pd.mass, 1.0);
-        assert_eq!(pd.id, 0);
+        assert_eq!(pd.potential_mass_id[1], 1.0);
+        assert_eq!(pd.potential_mass_id[2], 0.0);
         assert_eq!(pd.position[0], 0.0);
         assert_eq!(pd.position[1], 0.0);
         assert_eq!(pd.position[2], 0.0);
@@ -701,18 +701,18 @@ mod tests {
         let state_data = particle_data_vector_from_state(&state);
         assert_eq!(state_data.len(), 2);
         let pd = &state_data[0];
-        assert_eq!(pd.mass, 1.0);
-        assert_eq!(pd.id, 0);
+        assert_eq!(pd.potential_mass_id[1], 3.0);
+        assert_eq!(pd.potential_mass_id[2], 1.0);
         assert_eq!(pd.position[0], 0.0);
-        assert_eq!(pd.position[1], 0.0);
+        assert_eq!(pd.position[1], 0.5);
         assert_eq!(pd.position[2], 0.0);
         assert_eq!(pd.velocity[0], 0.0);
         assert_eq!(pd.velocity[1], 0.0);
         assert_eq!(pd.velocity[2], 0.0);
         let pd = &state_data[1];
-        assert_eq!(pd.mass, 3.0);
-        assert_eq!(pd.id, 1);
-        assert_eq!(pd.position[0], 1.0);
+        assert_eq!(pd.potential_mass_id[1], 1.0);
+        assert_eq!(pd.potential_mass_id[2], 0.0);
+        assert_eq!(pd.position[0], 0.0);
         assert_eq!(pd.position[1], 0.0);
         assert_eq!(pd.position[2], 0.0);
         assert_eq!(pd.velocity[0], 0.0);
