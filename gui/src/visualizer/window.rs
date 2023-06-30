@@ -20,6 +20,7 @@ use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
 use moldyn_core::Particle;
 use crate::visualizer::camera::Camera;
+use crate::visualizer::camera_controller::CameraController;
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
@@ -86,6 +87,8 @@ struct State {
     particles_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
     camera: Camera,
+    camera_controller: CameraController,
+    clear_screen_pipeline: wgpu::ComputePipeline,
     compute_pipeline: wgpu::ComputePipeline,
     render_to_screen_pipeline: wgpu::RenderPipeline,
     screen_bind_group: wgpu::BindGroup,
@@ -163,6 +166,12 @@ pub async fn visualizer_window() {
                     }
                 }
             }
+            Event::DeviceEvent {
+                ref event,
+                ..
+            } => {
+                state.camera_controller.process_events(&event);
+            }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
                 state.update();
                 match state.render() {
@@ -185,10 +194,10 @@ pub async fn visualizer_window() {
     });
 }
 
-fn create_compute_pipeline (device: &wgpu::Device,
-                            _config: &wgpu::SurfaceConfiguration,
+fn create_compute_pipelines (device: &wgpu::Device,
+                            clear_shader: &wgpu::ShaderModule,
                             shader: &wgpu::ShaderModule,
-                            compute_bind_group_layout: &wgpu::BindGroupLayout) -> wgpu::ComputePipeline {
+                            compute_bind_group_layout: &wgpu::BindGroupLayout) -> (wgpu::ComputePipeline, wgpu::ComputePipeline) {
     let compute_pipeline_layout =
         device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Compute renderer Pipeline Layout"),
@@ -201,7 +210,13 @@ fn create_compute_pipeline (device: &wgpu::Device,
         module: &shader,
         entry_point: "main",
     });
-    pipeline
+    let clear_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some("ClearTexture"),
+        layout: Some(&compute_pipeline_layout),
+        module: &clear_shader,
+        entry_point: "main",
+    });
+    (clear_pipeline, pipeline)
 }
 
 fn create_render_pipeline (device: &wgpu::Device,
@@ -257,12 +272,13 @@ fn create_render_pipeline (device: &wgpu::Device,
 fn create_pipelines(device: &wgpu::Device,
                     config: &wgpu::SurfaceConfiguration,
                     texture_bind_group_layout: &wgpu::BindGroupLayout,
-                    compute_bind_group_layout: &wgpu::BindGroupLayout) -> (wgpu::ComputePipeline, wgpu::RenderPipeline) {
+                    compute_bind_group_layout: &wgpu::BindGroupLayout) -> (wgpu::ComputePipeline, wgpu::ComputePipeline, wgpu::RenderPipeline) {
     let render_shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+    let clear_shader = device.create_shader_module(wgpu::include_wgsl!("clear_texture.wgsl"));
     let compute_shader = device.create_shader_module(wgpu::include_wgsl!("render_particles.wgsl"));
-    let compute_pipeline = create_compute_pipeline(device, config, &compute_shader, compute_bind_group_layout);
+    let (clear_pipeline, compute_pipeline) = create_compute_pipelines(device, &clear_shader, &compute_shader, compute_bind_group_layout);
     let render_pipeline = create_render_pipeline(device, config, &render_shader, texture_bind_group_layout);
-    (compute_pipeline, render_pipeline)
+    (clear_pipeline, compute_pipeline, render_pipeline)
 }
 
 async fn create_base_objects (window: &Window)
@@ -498,9 +514,10 @@ impl State {
         // We use the egui_wgpu_backend crate as the render backend.
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
         let egui_demo = egui_demo_lib::DemoWindows::default();
-        let (compute_pipeline, render_to_screen_pipeline) =
+        let (clear_screen_pipeline, compute_pipeline, render_to_screen_pipeline) =
             create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
         let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (size.width, size.height));
+        let camera_controller = CameraController::new(0.1);
         let mut res = Self {
             surface,
             device,
@@ -512,6 +529,8 @@ impl State {
             particles_buffer,
             camera_buffer,
             camera,
+            camera_controller,
+            clear_screen_pipeline,
             compute_pipeline,
             render_to_screen_pipeline,
             screen_bind_group,
@@ -540,7 +559,10 @@ impl State {
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
-            self.camera.update_angle(0.0, 0.0, self.config.width, self.config.height);
+            self.camera.update((self.camera.eye.x, self.camera.eye.y, self.camera.eye.z),
+                               (self.camera.forward.x, self.camera.forward.y, self.camera.forward.z),
+                               self.config.width,
+                               self.config.height);
             self.load_camera_to_buffer();
             self.surface.configure(&self.device, &self.config);
             // Recreate texture with new sizes
@@ -551,8 +573,9 @@ impl State {
             self.screen_texture = screen_texture;
             self.screen_bind_group = screen_bind_group;
             self.compute_bind_group = compute_bind_group;
-            let (compute_pipeline, render_to_screen_pipeline) =
+            let (clear_screen_pipeline, compute_pipeline, render_to_screen_pipeline) =
                 create_pipelines(&self.device, &self.config, &screen_bind_group_layout, &compute_bind_group_layout);
+            self.clear_screen_pipeline = clear_screen_pipeline;
             self.compute_pipeline = compute_pipeline;
             self.render_to_screen_pipeline = render_to_screen_pipeline;
         }
@@ -600,7 +623,10 @@ impl State {
         source_buffer.destroy();
     }
 
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        self.camera_controller.update_camera(&mut self.camera, self.config.width, self.config.height);
+        self.load_camera_to_buffer();
+    }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
@@ -612,6 +638,16 @@ impl State {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
+        { // Clear texture state
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Clear texture Pass"),
+            });
+            compute_pass.set_pipeline(&self.clear_screen_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            let x = self.config.width;
+            let y = self.config.height;
+            compute_pass.dispatch_workgroups(x, y, 1);
+        }
         { // Rendering particles to screen quad
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("MainRenderer Pass"),
