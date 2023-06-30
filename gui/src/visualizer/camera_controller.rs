@@ -1,3 +1,4 @@
+use cgmath::{Euler, Quaternion, Rad};
 use winit::event::{DeviceEvent, ElementState, MouseScrollDelta};
 use crate::visualizer::camera::Camera;
 
@@ -85,7 +86,11 @@ impl CameraController {
             } else {
                 0.0
             };
-            camera.rotate(-dx, -dy, (0.0, 0.0, 0.0), width, height);
+            let rotation = camera.get_model_matrix();
+            let quaternion_rotation = Quaternion::from(Euler::new(Rad(dy*0.5), Rad(-dx*0.5), Rad(0.0)));
+            let rotate = cgmath::Matrix4::from(quaternion_rotation);
+            let matrix = rotate * rotation;
+            camera.rotate(matrix, (0.0, 0.0, 0.0), width, height);
         }
         if self.scroll.abs() > 0.0 {
             camera.zoom(self.scroll * self.speed, width, height);

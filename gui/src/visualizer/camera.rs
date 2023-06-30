@@ -1,19 +1,18 @@
-use std::f32::consts::PI;
-use cgmath::{InnerSpace, MetricSpace, Point3, Vector3};
+use cgmath::{InnerSpace, Matrix4, MetricSpace, Point3, Quaternion, Vector3, Vector4};
 
 pub struct Camera {
-    pub eye: cgmath::Point3<f32>,
+    pub eye: Point3<f32>,
     pub fovx: f32,
-    pub forward: cgmath::Vector3<f32>,
-    pub right: cgmath::Vector3<f32>,
-    pub up: cgmath::Vector3<f32>,
+    pub forward: Vector3<f32>,
+    pub right: Vector3<f32>,
+    pub up: Vector3<f32>,
     pub width: u32,
     pub height: u32,
 }
 
-fn get_right_up(forward: &cgmath::Vector3<f32>, fovx: f32, width: u32, height: u32)
-    -> (cgmath::Vector3<f32>, cgmath::Vector3<f32>) {
-    let world_up = cgmath::Vector3::new(0.0, 1.0, 0.0);
+fn get_right_up(forward: &Vector3<f32>, fovx: f32, width: u32, height: u32)
+    -> (Vector3<f32>, Vector3<f32>) {
+    let world_up = Vector3::new(0.0, 1.0, 0.0);
     let mut right = forward.cross(world_up).normalize();
     let mut up = forward.cross(right).normalize();
     let angle_right = fovx.to_radians() / 2.0;
@@ -27,10 +26,10 @@ fn get_right_up(forward: &cgmath::Vector3<f32>, fovx: f32, width: u32, height: u
 
 impl Camera {
     pub fn new(eye: (f32, f32, f32), fovx: f32, screen_size: (u32, u32)) -> Self {
-        let forward = cgmath::Vector3::new(1.0, 0.0, 0.0);
+        let forward = Vector3::new(1.0, 0.0, 0.0);
         let (right, up) = get_right_up(&forward, fovx, screen_size.0, screen_size.1);
         Self {
-            eye: cgmath::Point3::new(eye.0, eye.1, eye.2),
+            eye: Point3::new(eye.0, eye.1, eye.2),
             fovx,
             forward,
             right,
@@ -59,29 +58,23 @@ impl Camera {
         self.up = up;
     }
 
-    pub fn look_to(&mut self, target: (f32, f32, f32)) -> (f32, f32, f32) {
-        let direction = (
-                target.0 - self.eye.x,
-                target.1 - self.eye.y,
-                target.2 - self.eye.z,
-            );
-        direction
+    pub fn get_model_matrix(&self) -> Matrix4<f32> {
+        let rotation = Quaternion::from_arc(Vector3::new(1.0, 0.0, 0.0), self.forward, None);
+        let res = cgmath::Matrix4::from(rotation);
+        res
     }
+    
+    
 
-    pub fn rotate(&mut self, dx: f32, dy: f32, target: (f32, f32, f32), width: u32, height: u32) {
-        // let target_point = Point3::new(target.0, target.1, target.2);
-        // let radius = target_point.distance(self.eye);
-        // let direction = (self.forward + dx * self.right + dy * self.up).normalize();
-        // let new_position = target_point - direction * radius;
-        // let direction_xz = Vector3::new(direction.x, 0.0, direction.z);
-        // let angle = direction.angle(direction_xz).0;
-        // if angle > PI / 3.0 || angle < -PI/3.0 {
-        //     return;
-        // }
-        // let new_position = (new_position.x, new_position.y, new_position.z);
-        // let new_direction = self.look_to(target);
-        //
-        // self.update(new_position, new_direction, width, height);
+    pub fn rotate(&mut self, rotation: Matrix4<f32>, target: (f32, f32, f32), width: u32, height: u32) {
+        let direction = (rotation * Vector4::new(1.0, 0.0, 0.0, 0.0))
+            .normalize().truncate();
+        let target_point = Point3::new(target.0, target.1, target.2);
+        let radius = self.eye.distance(target_point);
+        let position = target_point - direction * radius;
+        let new_direction = (direction.x, direction.y, direction.z);
+        let new_position = (position.x, position.y, position.z);
+        self.update(new_position, new_direction, width, height);
     }
 
     pub fn zoom(&mut self, delta: f32, width: u32, height: u32) {
