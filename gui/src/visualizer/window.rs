@@ -82,7 +82,7 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: PhysicalSize<u32>,
     window: Window,
-    _screen_texture: wgpu::Texture,
+    screen_texture: wgpu::Texture,
     particles_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
     camera: Camera,
@@ -309,6 +309,136 @@ async fn create_base_objects (window: &Window)
     (surface, adapter, device, queue)
 }
 
+fn create_screen_texture (device: &wgpu::Device,
+                          config: &wgpu::SurfaceConfiguration,
+                          particles_buffer: &wgpu::Buffer,
+                          camera_buffer: &wgpu::Buffer)
+    -> (wgpu::Texture, wgpu::BindGroup, wgpu::BindGroup, wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
+    let screen_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("screen_texture"),
+        size: wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::STORAGE_BINDING,
+        view_formats: &[],
+    });
+    let screen_texture_view = screen_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let screen_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Nearest,
+        mipmap_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+    let screen_bind_group_layout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    // This should match the filterable field of the
+                    // corresponding Texture entry above.
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("texture_bind_group_layout"),
+        });
+    let compute_bind_group_layout = device.create_bind_group_layout(
+        &wgpu::BindGroupLayoutDescriptor {
+            label: Some("compute_bind_group_layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+    let screen_bind_group = device.create_bind_group(
+        &wgpu::BindGroupDescriptor {
+            layout: &screen_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&screen_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&screen_sampler),
+                }
+            ],
+            label: Some("screen_bind_group"),
+        }
+    );
+    let compute_bind_group = device.create_bind_group(
+        &wgpu::BindGroupDescriptor {
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: particles_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&screen_texture_view)
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: camera_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("compute_bind_group"),
+        }
+    );
+    (screen_texture, screen_bind_group, compute_bind_group, screen_bind_group_layout, compute_bind_group_layout)
+}
+
 impl State {
     // Creating some of the wgpu types requires async code
     async fn new(window: Window) -> Self {
@@ -334,108 +464,6 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        let screen_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("screen_texture"),
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::STORAGE_BINDING,
-            view_formats: &[],
-        });
-        let screen_texture_view = screen_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let screen_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-        let screen_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        // This should match the filterable field of the
-                        // corresponding Texture entry above.
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
-                    },
-                ],
-                label: Some("texture_bind_group_layout"),
-            });
-        let compute_bind_group_layout = device.create_bind_group_layout(
-            &wgpu::BindGroupLayoutDescriptor {
-                label: Some("compute_bind_group_layout"),
-                entries: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::StorageTexture {
-                            access: wgpu::StorageTextureAccess::WriteOnly,
-                            format: wgpu::TextureFormat::Rgba8Unorm,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                ],
-            });
-        let screen_bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &screen_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&screen_texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&screen_sampler),
-                    }
-                ],
-                label: Some("screen_bind_group"),
-            }
-        );
         let particles_buffer = device.create_buffer(
             &wgpu::BufferDescriptor {
                 label: Some("particles_buffer"),
@@ -463,30 +491,15 @@ impl State {
             font_definitions: FontDefinitions::default(),
             style: Default::default(),
         });
+        let (screen_texture,
+            screen_bind_group, compute_bind_group,
+            screen_bind_group_layout, compute_bind_group_layout) =
+            create_screen_texture(&device, &config, &particles_buffer, &camera_buffer);
         // We use the egui_wgpu_backend crate as the render backend.
         let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
         let egui_demo = egui_demo_lib::DemoWindows::default();
-        let compute_bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                layout: &compute_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: particles_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&screen_texture_view)
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: camera_buffer.as_entire_binding(),
-                    }
-                ],
-                label: Some("compute_bind_group"),
-            }
-        );
-        let (compute_pipeline, render_to_screen_pipeline) = create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
+        let (compute_pipeline, render_to_screen_pipeline) =
+            create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
         let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (size.width, size.height));
         let mut res = Self {
             surface,
@@ -495,7 +508,7 @@ impl State {
             config,
             size,
             window,
-            _screen_texture: screen_texture,
+            screen_texture,
             particles_buffer,
             camera_buffer,
             camera,
@@ -527,7 +540,21 @@ impl State {
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
+            self.camera.update_angle(0.0, 0.0, self.config.width, self.config.height);
+            self.load_camera_to_buffer();
             self.surface.configure(&self.device, &self.config);
+            // Recreate texture with new sizes
+            let (screen_texture,
+                screen_bind_group, compute_bind_group,
+                screen_bind_group_layout, compute_bind_group_layout) =
+                create_screen_texture(&self.device, &self.config, &self.particles_buffer, &self.camera_buffer);
+            self.screen_texture = screen_texture;
+            self.screen_bind_group = screen_bind_group;
+            self.compute_bind_group = compute_bind_group;
+            let (compute_pipeline, render_to_screen_pipeline) =
+                create_pipelines(&self.device, &self.config, &screen_bind_group_layout, &compute_bind_group_layout);
+            self.compute_pipeline = compute_pipeline;
+            self.render_to_screen_pipeline = render_to_screen_pipeline;
         }
     }
 

@@ -16,9 +16,9 @@ fn get_right_up(forward: &cgmath::Vector3<f32>, fovx: f32, width: u32, height: u
     let mut right = forward.cross(world_up).normalize();
     let mut up = forward.cross(right).normalize();
     let angle_right = fovx.to_radians() / 2.0;
-    let angle_up = angle_right / width as f32 * height as f32;
+    let up_to_right = height as f32 / width as f32;
     let right_length = angle_right.tan();
-    let up_length = angle_up.tan();
+    let up_length = right_length * up_to_right;
     up *= up_length;
     right *= right_length;
     (right, up)
@@ -48,7 +48,7 @@ impl Camera {
         self.height = height;
     }
 
-    pub fn _update_angle(&mut self, dx: f32, dy: f32, width: u32, height: u32) {
+    pub fn update_angle(&mut self, dx: f32, dy: f32, width: u32, height: u32) {
         let forward = self.forward + self.right * dx + self.up * dy;
         let forward = forward.normalize();
         let (right, up) = get_right_up(&forward, self.fovx, width, height);

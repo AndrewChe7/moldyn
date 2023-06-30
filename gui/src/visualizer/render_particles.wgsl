@@ -34,22 +34,36 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let y = i32(global_id.y);
     let x_relative = (f32(x) / f32(camera.width)) * 2.0 - 1.0;
     let y_relative = (f32(y) / f32(camera.height)) * 2.0 - 1.0;
+    let light_dir = -normalize(vec3<f32>(1.0, -1.0, 1.0));
     let particle = state[global_id.z];
     let particle_position = particle.position;
     let pos = vec3<f32>(f32(particle_position.x), f32(particle_position.y), f32(particle_position.z));
     let radius = f32(particle.potential_mass_id.y) * 0.1;
     let direction = camera.forward + camera.right * x_relative + camera.up * y_relative;
-    let direction_normalized = normalize(direction.xyz) / 100.0;
-    var collided = false;
-    for (var i: i32 = 1; i < 100 && !collided; i += 1) {
-        let check_point = camera.eye.xyz + direction_normalized * f32(i);
+    let direction_normalized = normalize(direction.xyz);// / 100.0;
+    var ray_point = camera.eye.xyz;
+    for (var i: i32 = 1; i < 64; i += 1) {
+        let distance_to_ball = distance(ray_point, pos);
+        let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);
-        if (distance_to_particle < radius) {
-            let c = f32(100 - i) / 100.0;
-            textureStore(screen_texture,
-                                vec2<i32>(x, y),
-                                vec4<f32>(c, c, c, 1.0));
+        if (distance_to_particle > 10000.0) {
             break;
         }
+        if (distance_to_particle < radius) {
+            let normal = normalize(check_point - pos);
+//            var c = 0.0;
+//            if (dot(light_dir, normal) >= 0.0) {
+//                let view_vector = normalize(camera.eye.xyz - check_point);
+//                let half_dir = normalize(view_vector + light_dir);
+//                c = max(dot(half_dir, normal), 0.0);
+//                c = pow(c, 2.0);
+//            }
+            textureStore(screen_texture,
+                                vec2<i32>(x, y),
+                                vec4<f32>((normal + 1.0) / 2.0, 1.0));
+                                //vec4<f32>(c, c, c, 1.0));
+            break;
+        }
+        ray_point = check_point;
     }
 }
