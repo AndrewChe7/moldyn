@@ -43,25 +43,21 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let direction_normalized = normalize(direction.xyz);// / 100.0;
     var ray_point = camera.eye.xyz;
     for (var i: i32 = 1; i < 64; i += 1) {
-        let distance_to_ball = distance(ray_point, pos);
+        let distance_to_ball = distance(ray_point, pos) - radius;
         let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);
         if (distance_to_particle > 10000.0) {
             break;
         }
-        if (distance_to_particle < radius) {
+        if (distance_to_particle - radius < 0.001) {
             let normal = normalize(check_point - pos);
-//            var c = 0.0;
-//            if (dot(light_dir, normal) >= 0.0) {
-//                let view_vector = normalize(camera.eye.xyz - check_point);
-//                let half_dir = normalize(view_vector + light_dir);
-//                c = max(dot(half_dir, normal), 0.0);
-//                c = pow(c, 2.0);
-//            }
+            let view_vector = normalize(camera.eye.xyz - check_point);
+            let half_dir = normalize(view_vector + light_dir);
+            var c = max(dot(half_dir, normal), 0.15);
+            c = pow(c, 3.0);
             textureStore(screen_texture,
                                 vec2<i32>(x, y),
-                                vec4<f32>((normal + 1.0) / 2.0, 1.0));
-                                //vec4<f32>(c, c, c, 1.0));
+                                vec4<f32>(c, c, c, 1.0));
             break;
         }
         ray_point = check_point;
