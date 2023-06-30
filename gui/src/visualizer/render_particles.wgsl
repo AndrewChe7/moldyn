@@ -25,7 +25,9 @@ var screen_texture : texture_storage_2d<rgba8unorm, write>;
 @group(0)
 @binding(2)
 var<uniform> camera: CameraData;
-
+@group(0)
+@binding(3)
+var<storage, read_write> depth_buffer: array<f32>;
 
 @compute
 @workgroup_size(1, 1, 1)
@@ -46,15 +48,21 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         let distance_to_ball = distance(ray_point, pos) - radius;
         let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);
-        if (distance_to_particle > 10000.0) {
+        let distance_to_camera = distance(check_point, camera.eye.xyz);
+        if (distance_to_camera > 5.0) {
             break;
         }
         if (distance_to_particle - radius < 0.001) {
+            let depth = (5.0 - distance_to_camera) / 5.0;
+            if (depth < depth_buffer[y * i32(camera.width) + x]) {
+                return;
+            }
             let normal = normalize(check_point - pos);
             let view_vector = normalize(camera.eye.xyz - check_point);
             let half_dir = normalize(view_vector + light_dir);
             var c = max(dot(half_dir, normal), 0.15);
             c = pow(c, 3.0);
+            depth_buffer[y * i32(camera.width) + x] = depth;
             textureStore(screen_texture,
                                 vec2<i32>(x, y),
                                 vec4<f32>(c, c, c, 1.0));

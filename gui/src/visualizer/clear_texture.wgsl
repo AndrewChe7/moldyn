@@ -25,7 +25,9 @@ var screen_texture : texture_storage_2d<rgba8unorm, write>;
 @group(0)
 @binding(2)
 var<uniform> camera: CameraData;
-
+@group(0)
+@binding(3)
+var<storage, read_write> depth_buffer: array<f32>;
 
 @compute
 @workgroup_size(1, 1, 1)
@@ -35,5 +37,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     textureStore(screen_texture,
                         vec2<i32>(x, y),
                         vec4<f32>(0.01, 0.01, 0.02, 1.0));
-
+    depth_buffer[y * i32(camera.width) + x] = 0.0;
 }

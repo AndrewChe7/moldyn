@@ -69,19 +69,19 @@ impl Camera {
     }
 
     pub fn rotate(&mut self, dx: f32, dy: f32, target: (f32, f32, f32), width: u32, height: u32) {
-        let target_point = Point3::new(target.0, target.1, target.2);
-        let radius = target_point.distance(self.eye);
-        let direction = (self.forward + dx * self.right + dy * self.up).normalize();
-        let new_position = target_point - direction * radius;
-        let direction_xz = Vector3::new(direction.x, 0.0, direction.z);
-        let angle = direction.angle(direction_xz).0;
-        if angle > PI / 3.0 || angle < -PI/3.0 {
-            return;
-        }
-        let new_position = (new_position.x, new_position.y, new_position.z);
-        let new_direction = self.look_to(target);
-
-        self.update(new_position, new_direction, width, height);
+        // let target_point = Point3::new(target.0, target.1, target.2);
+        // let radius = target_point.distance(self.eye);
+        // let direction = (self.forward + dx * self.right + dy * self.up).normalize();
+        // let new_position = target_point - direction * radius;
+        // let direction_xz = Vector3::new(direction.x, 0.0, direction.z);
+        // let angle = direction.angle(direction_xz).0;
+        // if angle > PI / 3.0 || angle < -PI/3.0 {
+        //     return;
+        // }
+        // let new_position = (new_position.x, new_position.y, new_position.z);
+        // let new_direction = self.look_to(target);
+        //
+        // self.update(new_position, new_direction, width, height);
     }
 
     pub fn zoom(&mut self, delta: f32, width: u32, height: u32) {

@@ -121,8 +121,12 @@ impl Default for State {
                                Vector3::new(0.0, 0.5, 0.0),
                                Vector3::new(0.0, 0.0, 0.0))
             .expect("Can't create particle");
+        let p3 = Particle::new(1,
+                               Vector3::new(0.0, 0.25, 0.0),
+                               Vector3::new(0.0, 0.0, 0.0))
+            .expect("Can't create particle");
         State {
-            particles: vec![Mutex::new(p2), Mutex::new(p1)],
+            particles: vec![Mutex::new(p1), Mutex::new(p2), Mutex::new(p3)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         }
     }

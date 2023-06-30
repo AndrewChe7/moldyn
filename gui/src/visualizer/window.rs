@@ -85,6 +85,7 @@ struct State {
     window: Window,
     screen_texture: wgpu::Texture,
     particles_buffer: wgpu::Buffer,
+    depth_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
     camera: Camera,
     camera_controller: CameraController,
@@ -329,7 +330,7 @@ fn create_screen_texture (device: &wgpu::Device,
                           config: &wgpu::SurfaceConfiguration,
                           particles_buffer: &wgpu::Buffer,
                           camera_buffer: &wgpu::Buffer)
-    -> (wgpu::Texture, wgpu::BindGroup, wgpu::BindGroup, wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
+    -> (wgpu::Texture, wgpu::Buffer, wgpu::BindGroup, wgpu::BindGroup, wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
     let screen_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("screen_texture"),
         size: wgpu::Extent3d {
@@ -355,6 +356,12 @@ fn create_screen_texture (device: &wgpu::Device,
         min_filter: wgpu::FilterMode::Nearest,
         mipmap_filter: wgpu::FilterMode::Nearest,
         ..Default::default()
+    });
+    let depth_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Depth buffer"),
+        size: (config.width * config.height * std::mem::size_of::<f32>() as u32) as wgpu::BufferAddress,
+        usage: wgpu::BufferUsages::STORAGE,
+        mapped_at_creation: false,
     });
     let screen_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -414,6 +421,16 @@ fn create_screen_texture (device: &wgpu::Device,
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
             ],
         });
     let screen_bind_group = device.create_bind_group(
@@ -447,12 +464,16 @@ fn create_screen_texture (device: &wgpu::Device,
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: camera_buffer.as_entire_binding(),
-                }
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: depth_buffer.as_entire_binding(),
+                },
             ],
             label: Some("compute_bind_group"),
         }
     );
-    (screen_texture, screen_bind_group, compute_bind_group, screen_bind_group_layout, compute_bind_group_layout)
+    (screen_texture, depth_buffer, screen_bind_group, compute_bind_group, screen_bind_group_layout, compute_bind_group_layout)
 }
 
 impl State {
@@ -507,7 +528,7 @@ impl State {
             font_definitions: FontDefinitions::default(),
             style: Default::default(),
         });
-        let (screen_texture,
+        let (screen_texture, depth_buffer,
             screen_bind_group, compute_bind_group,
             screen_bind_group_layout, compute_bind_group_layout) =
             create_screen_texture(&device, &config, &particles_buffer, &camera_buffer);
@@ -527,6 +548,7 @@ impl State {
             window,
             screen_texture,
             particles_buffer,
+            depth_buffer,
             camera_buffer,
             camera,
             camera_controller,
@@ -566,11 +588,12 @@ impl State {
             self.load_camera_to_buffer();
             self.surface.configure(&self.device, &self.config);
             // Recreate texture with new sizes
-            let (screen_texture,
+            let (screen_texture, depth_buffer,
                 screen_bind_group, compute_bind_group,
                 screen_bind_group_layout, compute_bind_group_layout) =
                 create_screen_texture(&self.device, &self.config, &self.particles_buffer, &self.camera_buffer);
             self.screen_texture = screen_texture;
+            self.depth_buffer = depth_buffer;
             self.screen_bind_group = screen_bind_group;
             self.compute_bind_group = compute_bind_group;
             let (clear_screen_pipeline, compute_pipeline, render_to_screen_pipeline) =
