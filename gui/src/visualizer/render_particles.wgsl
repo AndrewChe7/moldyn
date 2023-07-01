@@ -44,13 +44,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let direction = camera.forward + camera.right * x_relative + camera.up * y_relative;
     let direction_normalized = normalize(direction.xyz);// / 100.0;
     var ray_point = camera.eye.xyz;
-    for (var i: i32 = 1; i < 32; i += 1) {
+    for (var i: i32 = 0; i < 8; i += 1) {
         let distance_to_ball = distance(ray_point, pos) - radius;
         let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);
         let distance_to_camera = distance(check_point, camera.eye.xyz);
-        if (distance_to_camera > 20.0) {
-            break;
+        if (distance_to_particle > 2.0) {
+            return;
+        }
+        if (distance_to_camera > 40.0) {
+            return;
         }
         if (distance_to_particle - radius < 0.001) {
             let depth = (20.0 - distance_to_camera) / 20.0;
@@ -67,7 +70,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             textureStore(screen_texture,
                                 vec2<i32>(x, y),
                                 vec4<f32>(c, c, c, 1.0));
-            break;
+            return;
         }
         ray_point = check_point;
     }

@@ -10,7 +10,7 @@ use winit::{
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
-const MAX_PARTICLES: usize = 1000;
+const MAX_PARTICLES: usize = 512;
 
 use bytemuck::Pod;
 use bytemuck::Zeroable;
@@ -88,6 +88,7 @@ struct State {
     size: PhysicalSize<u32>,
     window: Window,
     screen_texture: wgpu::Texture,
+    particles_state: moldyn_core::State,
     particles_buffer: wgpu::Buffer,
     depth_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
@@ -99,7 +100,6 @@ struct State {
     render_to_screen_pipeline: wgpu::RenderPipeline,
     screen_bind_group: wgpu::BindGroup,
     compute_bind_group: wgpu::BindGroup,
-    particle_count: u32,
     platform: Platform,
     egui_rpass: egui_wgpu_backend::RenderPass,
     _egui_demo: egui_demo_lib::DemoWindows,
@@ -304,7 +304,7 @@ async fn create_base_objects (window: &Window)
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
+            power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         })
@@ -546,6 +546,15 @@ impl State {
         let camera_controller = CameraController::new(0.1);
         let timer = Instant::now();
         let delta_time = 0.0;
+        let mut particles_state = moldyn_solver::initializer::initialize_particles(1000,
+                                                                                   &Vector3::new(10.0, 10.0, 10.0));
+        ParticleDatabase::add(0, "Argon", 1.0);
+        moldyn_solver::initializer::initialize_particles_position(&mut particles_state,
+                                                                  0, 0,
+                                                                  (0.0, 0.0, 0.0),
+                                                                  (10, 10, 10),
+                                                                  1.0)
+            .expect("Can't initialize particles state");
         let mut res = Self {
             timer,
             delta_time,
@@ -556,6 +565,7 @@ impl State {
             size,
             window,
             screen_texture,
+            particles_state,
             particles_buffer,
             depth_buffer,
             camera_buffer,
@@ -567,21 +577,10 @@ impl State {
             render_to_screen_pipeline,
             screen_bind_group,
             compute_bind_group,
-            particle_count: 0,
             platform,
             egui_rpass,
             _egui_demo: egui_demo,
         };
-        let mut particles_state = moldyn_solver::initializer::initialize_particles(1000,
-                                                                               &Vector3::new(10.0, 10.0, 10.0));
-        ParticleDatabase::add(0, "Argon", 1.0);
-        moldyn_solver::initializer::initialize_particles_position(&mut particles_state,
-                                                                  0, 0,
-                                                                  (0.0, 0.0, 0.0),
-                                                                  (10, 10, 10),
-                                                                  1.0)
-            .expect("Can't initialize particles state");
-        res.load_state_to_buffer(&particles_state);
         res.load_camera_to_buffer();
         res
     }
@@ -626,22 +625,12 @@ impl State {
         false
     }
 
-    fn load_state_to_buffer (&mut self, state: &moldyn_core::State) {
-        let load_buffer = particle_data_vector_from_state(state);
-        let mut center = (0.0, 0.0, 0.0);
-        let buffer_size = load_buffer.len() as f64;
-        for particle_data in &load_buffer {
-            center.0 += particle_data.position[0] / buffer_size;
-            center.1 += particle_data.position[1] / buffer_size;
-            center.2 += particle_data.position[2] / buffer_size;
-        }
-        self.particles_center = (center.0 as f32, center.1 as f32, center.2 as f32);
-        self.particle_count = state.particles.len() as u32;
+    fn load_state_to_buffer (&mut self, load_buffer: &[ParticleData]) {
         let source_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("State data load buffer"),
             usage: wgpu::BufferUsages::STORAGE
                 | wgpu::BufferUsages::COPY_SRC,
-            contents: bytemuck::cast_slice(&load_buffer),
+            contents: bytemuck::cast_slice(load_buffer),
         });
         let mut command_encoder = self.device.create_command_encoder(
             &wgpu::CommandEncoderDescriptor {
@@ -678,6 +667,50 @@ impl State {
         self.load_camera_to_buffer();
     }
 
+    fn render_particles (&mut self, particles: &[ParticleData]) {
+        self.load_state_to_buffer(particles);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("MainRenderer Pass"),
+            });
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            let x = self.config.width;
+            let y = self.config.height;
+            compute_pass.dispatch_workgroups(x / 8, y / 8, (particles.len() + 3) as u32 / 4);
+        }
+        self.queue.submit(Some(encoder.finish()));
+    }
+
+    fn get_center(&mut self, buffer: &[ParticleData]) {
+        let mut center: (f32, f32, f32) = (0.0, 0.0, 0.0);
+        let buffer_size = buffer.len();
+        for particle in buffer {
+            center.0 += particle.position[0] as f32 / buffer_size as f32;
+            center.1 += particle.position[1] as f32 / buffer_size as f32;
+            center.2 += particle.position[2] as f32 / buffer_size as f32;
+        }
+        self.particles_center = center;
+    }
+
+    fn render_all_particles (&mut self) {
+        let load_buffer = particle_data_vector_from_state(&self.particles_state);
+        self.get_center(&load_buffer);
+        let buffer_size = load_buffer.len();
+        let batch_count = (buffer_size + MAX_PARTICLES - 1) / MAX_PARTICLES;
+        for i in 0..batch_count {
+            let slice_start = i * MAX_PARTICLES;
+            let slice_end = ((i + 1) * MAX_PARTICLES).min(buffer_size);
+            let slice = &load_buffer[slice_start..slice_end];
+            self.render_particles(slice);
+        }
+    }
+
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let elapsed = self.timer.elapsed();
         self.delta_time = elapsed.as_secs_f64();
@@ -701,16 +734,13 @@ impl State {
             let y = self.config.height;
             compute_pass.dispatch_workgroups(x / 8, y / 8, 1);
         }
-        { // Rendering particles to screen quad
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("MainRenderer Pass"),
+        self.queue.submit(Some(encoder.finish()));
+        self.render_all_particles();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
             });
-            compute_pass.set_pipeline(&self.compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
-            let x = self.config.width;
-            let y = self.config.height;
-            compute_pass.dispatch_workgroups(x / 8, y / 8, self.particle_count / 4 + 4);
-        }
         { // Rendering screen quad
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
