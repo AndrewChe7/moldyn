@@ -70,7 +70,7 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera, width: u32, height: u32) {
+    pub fn update_camera(&mut self, camera: &mut Camera, target: (f32, f32, f32), width: u32, height: u32) {
         if self.is_mouse_key_pressed {
             let dx = if self.delta_mouse.0 > 0.0 {
                 self.speed
@@ -90,7 +90,7 @@ impl CameraController {
             let quaternion_rotation = Quaternion::from(Euler::new(Rad(dy*0.5), Rad(-dx*0.5), Rad(0.0)));
             let rotate = cgmath::Matrix4::from(quaternion_rotation);
             let matrix = rotate * rotation;
-            camera.rotate(matrix, (0.0, 0.0, 0.0), width, height);
+            camera.rotate(matrix, target, width, height);
         }
         if self.scroll.abs() > 0.0 {
             camera.zoom(self.scroll * self.speed, width, height);

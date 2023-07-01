@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 moldyn_core = { path = "../core" }
+moldyn_solver = { path = "../solver" }
 bytemuck = {version = "1.13.1", features = ["derive"]}
 nalgebra = "0.32.2"
 cgmath = "0.18.0"

@@ -30,7 +30,7 @@ var<uniform> camera: CameraData;
 var<storage, read_write> depth_buffer: array<f32>;
 
 @compute
-@workgroup_size(1, 1, 1)
+@workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = i32(global_id.x);
     let y = i32(global_id.y);
@@ -44,16 +44,16 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let direction = camera.forward + camera.right * x_relative + camera.up * y_relative;
     let direction_normalized = normalize(direction.xyz);// / 100.0;
     var ray_point = camera.eye.xyz;
-    for (var i: i32 = 1; i < 64; i += 1) {
+    for (var i: i32 = 1; i < 32; i += 1) {
         let distance_to_ball = distance(ray_point, pos) - radius;
         let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);
         let distance_to_camera = distance(check_point, camera.eye.xyz);
-        if (distance_to_camera > 5.0) {
+        if (distance_to_camera > 20.0) {
             break;
         }
         if (distance_to_particle - radius < 0.001) {
-            let depth = (5.0 - distance_to_camera) / 5.0;
+            let depth = (20.0 - distance_to_camera) / 20.0;
             if (depth < depth_buffer[y * i32(camera.width) + x]) {
                 return;
             }

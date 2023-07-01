@@ -1,3 +1,4 @@
+use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::window::Window;
@@ -16,9 +17,10 @@ use bytemuck::Zeroable;
 use egui::FontDefinitions;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::{Platform, PlatformDescriptor};
+use nalgebra::Vector3;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalSize;
-use moldyn_core::Particle;
+use moldyn_core::{Particle, ParticleDatabase};
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 
@@ -77,6 +79,8 @@ fn particle_data_vector_from_state(state: &moldyn_core::State) -> Vec<ParticleDa
 }
 
 struct State {
+    timer: Instant,
+    delta_time: f64,
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -89,6 +93,7 @@ struct State {
     camera_buffer: wgpu::Buffer,
     camera: Camera,
     camera_controller: CameraController,
+    particles_center: (f32, f32, f32),
     clear_screen_pipeline: wgpu::ComputePipeline,
     compute_pipeline: wgpu::ComputePipeline,
     render_to_screen_pipeline: wgpu::RenderPipeline,
@@ -97,7 +102,7 @@ struct State {
     particle_count: u32,
     platform: Platform,
     egui_rpass: egui_wgpu_backend::RenderPass,
-    egui_demo: egui_demo_lib::DemoWindows,
+    _egui_demo: egui_demo_lib::DemoWindows,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -539,7 +544,11 @@ impl State {
             create_pipelines(&device, &config, &screen_bind_group_layout, &compute_bind_group_layout);
         let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (size.width, size.height));
         let camera_controller = CameraController::new(0.1);
+        let timer = Instant::now();
+        let delta_time = 0.0;
         let mut res = Self {
+            timer,
+            delta_time,
             surface,
             device,
             queue,
@@ -552,6 +561,7 @@ impl State {
             camera_buffer,
             camera,
             camera_controller,
+            particles_center: (0.0, 0.0, 0.0),
             clear_screen_pipeline,
             compute_pipeline,
             render_to_screen_pipeline,
@@ -560,9 +570,17 @@ impl State {
             particle_count: 0,
             platform,
             egui_rpass,
-            egui_demo,
+            _egui_demo: egui_demo,
         };
-        let particles_state = moldyn_core::State::default();
+        let mut particles_state = moldyn_solver::initializer::initialize_particles(1000,
+                                                                               &Vector3::new(10.0, 10.0, 10.0));
+        ParticleDatabase::add(0, "Argon", 1.0);
+        moldyn_solver::initializer::initialize_particles_position(&mut particles_state,
+                                                                  0, 0,
+                                                                  (0.0, 0.0, 0.0),
+                                                                  (10, 10, 10),
+                                                                  1.0)
+            .expect("Can't initialize particles state");
         res.load_state_to_buffer(&particles_state);
         res.load_camera_to_buffer();
         res
@@ -610,6 +628,14 @@ impl State {
 
     fn load_state_to_buffer (&mut self, state: &moldyn_core::State) {
         let load_buffer = particle_data_vector_from_state(state);
+        let mut center = (0.0, 0.0, 0.0);
+        let buffer_size = load_buffer.len() as f64;
+        for particle_data in &load_buffer {
+            center.0 += particle_data.position[0] / buffer_size;
+            center.1 += particle_data.position[1] / buffer_size;
+            center.2 += particle_data.position[2] / buffer_size;
+        }
+        self.particles_center = (center.0 as f32, center.1 as f32, center.2 as f32);
         self.particle_count = state.particles.len() as u32;
         let source_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("State data load buffer"),
@@ -647,11 +673,15 @@ impl State {
     }
 
     fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera, self.config.width, self.config.height);
+        let center = (self.particles_center.0, self.particles_center.1, self.particles_center.2);
+        self.camera_controller.update_camera(&mut self.camera, center, self.config.width, self.config.height);
         self.load_camera_to_buffer();
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let elapsed = self.timer.elapsed();
+        self.delta_time = elapsed.as_secs_f64();
+        self.timer = Instant::now();
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -669,7 +699,7 @@ impl State {
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
             let x = self.config.width;
             let y = self.config.height;
-            compute_pass.dispatch_workgroups(x, y, 1);
+            compute_pass.dispatch_workgroups(x / 8, y / 8, 1);
         }
         { // Rendering particles to screen quad
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -679,7 +709,7 @@ impl State {
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
             let x = self.config.width;
             let y = self.config.height;
-            compute_pass.dispatch_workgroups(x, y, self.particle_count);
+            compute_pass.dispatch_workgroups(x / 8, y / 8, self.particle_count / 4 + 4);
         }
         { // Rendering screen quad
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -705,8 +735,15 @@ impl State {
         }
         {
             self.platform.begin_frame();
+            let ctx = &self.platform.context();
             /////
-            self.egui_demo.ui(&self.platform.context());
+            // self.egui_demo.ui(&self.platform.context());
+            egui::Window::new("FPS counter").show(ctx, |ui| {
+                let time = self.delta_time;
+                let fps = 1.0 / time;
+                ui.label(format!("Time: {}", time));
+                ui.label(format!("FPS: {}", fps));
+            });
             ////
             // End the UI frame. We could now handle the output and draw the UI with the backend.
             let full_output = self.platform.end_frame(Some(&self.window));
