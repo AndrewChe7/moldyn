@@ -57,11 +57,12 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             if (depth < depth_buffer[y * i32(camera.width) + x]) {
                 return;
             }
+            var c = 0.01;
             let normal = normalize(check_point - pos);
             let view_vector = normalize(camera.eye.xyz - check_point);
+            c += pow(max(dot(normal, light_dir), 0.0), 3.0);
             let half_dir = normalize(view_vector + light_dir);
-            var c = max(dot(half_dir, normal), 0.15);
-            c = pow(c, 3.0);
+            c += pow(max(dot(normal, half_dir), 0.0), 32.0);
             depth_buffer[y * i32(camera.width) + x] = depth;
             textureStore(screen_texture,
                                 vec2<i32>(x, y),
