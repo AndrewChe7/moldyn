@@ -18,7 +18,7 @@ struct CameraData {
 
 @group(0)
 @binding(0)
-var<storage, read_write> state: array<Particle>;
+var<storage, read_write> state: array<Particle, 512>;
 @group(0)
 @binding(1)
 var screen_texture : texture_storage_2d<rgba8unorm, write>;

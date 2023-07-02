@@ -1,4 +1,5 @@
 mod window;
-mod camera;
-mod camera_controller;
+pub mod camera;
+pub mod camera_controller;
 pub use window::*;
+

@@ -63,8 +63,6 @@ impl Camera {
         let res = cgmath::Matrix4::from(rotation);
         res
     }
-    
-    
 
     pub fn rotate(&mut self, rotation: Matrix4<f32>, target: (f32, f32, f32), width: u32, height: u32) {
         let direction = (rotation * Vector4::new(1.0, 0.0, 0.0, 0.0))
