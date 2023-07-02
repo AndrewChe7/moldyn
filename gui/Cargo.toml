@@ -3,6 +3,14 @@ name = "moldyn_gui"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "moldyn_gui_lite"
+path = "src/main_lite.rs"
+
+[[bin]]
+name = "moldyn_gui_ray"
+path = "src/main.rs"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

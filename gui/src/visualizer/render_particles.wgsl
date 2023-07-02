@@ -44,7 +44,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let direction = camera.forward + camera.right * x_relative + camera.up * y_relative;
     let direction_normalized = normalize(direction.xyz);// / 100.0;
     var ray_point = camera.eye.xyz;
-    for (var i: i32 = 0; i < 8; i += 1) {
+    for (var i: i32 = 0; i < 32; i += 1) {
         let distance_to_ball = distance(ray_point, pos) - radius;
         let check_point = ray_point + direction_normalized * distance_to_ball;
         let distance_to_particle = distance(check_point, pos);

@@ -2,7 +2,7 @@ use cgmath::{InnerSpace, Matrix4, MetricSpace, Point3, Quaternion, Vector3, Vect
 
 pub struct Camera {
     pub eye: Point3<f32>,
-    pub fovx: f32,
+    pub fovy: f32,
     pub forward: Vector3<f32>,
     pub right: Vector3<f32>,
     pub up: Vector3<f32>,
@@ -10,27 +10,27 @@ pub struct Camera {
     pub height: u32,
 }
 
-fn get_right_up(forward: &Vector3<f32>, fovx: f32, width: u32, height: u32)
+fn get_right_up(forward: &Vector3<f32>, fovy: f32, width: u32, height: u32)
     -> (Vector3<f32>, Vector3<f32>) {
     let world_up = Vector3::new(0.0, 1.0, 0.0);
     let mut right = forward.cross(world_up).normalize();
     let mut up = forward.cross(right).normalize();
-    let angle_right = fovx.to_radians() / 2.0;
+    let angle_up = fovy.to_radians() / 2.0;
     let up_to_right = height as f32 / width as f32;
-    let right_length = angle_right.tan();
-    let up_length = right_length * up_to_right;
+    let up_length = angle_up.tan();
+    let right_length = up_length / up_to_right;
     up *= up_length;
     right *= right_length;
     (right, up)
 }
 
 impl Camera {
-    pub fn new(eye: (f32, f32, f32), fovx: f32, screen_size: (u32, u32)) -> Self {
+    pub fn new(eye: (f32, f32, f32), fovy: f32, screen_size: (u32, u32)) -> Self {
         let forward = Vector3::new(1.0, 0.0, 0.0);
-        let (right, up) = get_right_up(&forward, fovx, screen_size.0, screen_size.1);
+        let (right, up) = get_right_up(&forward, fovy, screen_size.0, screen_size.1);
         Self {
             eye: Point3::new(eye.0, eye.1, eye.2),
-            fovx,
+            fovy,
             forward,
             right,
             up,
@@ -53,7 +53,7 @@ impl Camera {
         self.forward = self.forward.normalize();
         self.width = width;
         self.height = height;
-        let (right, up) = get_right_up(&self.forward, self.fovx, width, height);
+        let (right, up) = get_right_up(&self.forward, self.fovy, width, height);
         self.right = right;
         self.up = up;
     }

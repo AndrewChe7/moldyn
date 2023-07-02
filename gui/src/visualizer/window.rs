@@ -8,8 +8,8 @@ use winit::{
     window::WindowBuilder,
 };
 
-const WIDTH: u32 = 1920;
-const HEIGHT: u32 = 1080;
+const WIDTH: u32 = 640;
+const HEIGHT: u32 = 320;
 const MAX_PARTICLES: usize = 512;
 
 use bytemuck::Pod;
@@ -40,7 +40,7 @@ pub struct CameraData {
     forward: [f32; 4],
     right: [f32; 4],
     up: [f32; 4],
-    fovx: f32,
+    fovy: f32,
     width: u32,
     height: u32,
     _padding: u32,
@@ -61,7 +61,7 @@ fn camera_data_from_camera(camera: &Camera) -> CameraData {
         forward: [camera.forward.x, camera.forward.y, camera.forward.z, 0.0],
         right: [camera.right.x, camera.right.y, camera.right.z, 0.0],
         up: [camera.up.x, camera.up.y, camera.up.z, 0.0],
-        fovx: camera.fovx,
+        fovy: camera.fovy,
         width: camera.width,
         height: camera.height,
         _padding: 0,
@@ -118,6 +118,8 @@ pub async fn visualizer_window() {
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
+        .with_title("Ray marching visualizer")
+        .with_resizable(false)
         .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
         .build(&event_loop).unwrap();
 
