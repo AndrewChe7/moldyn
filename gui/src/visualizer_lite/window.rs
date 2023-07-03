@@ -417,17 +417,17 @@ impl State {
         }
         self.particles_data = data;
         self.particles_center = center;
+        self.update_instance_buffer();
     }
 
-    fn update_instance_buffer (&mut self, first: usize) {
-        let last = (first + PARTICLE_COUNT).min(self.particles_data.len());
+    fn update_instance_buffer (&mut self) {
         let instance_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&self.particles_data[first..last]),
+            contents: bytemuck::cast_slice(&self.particles_data.as_slice()),
             usage: wgpu::BufferUsages::VERTEX,
         });
         self.instance_buffer = instance_buffer;
-        self.instance_count = (last - first) as u32;
+        self.instance_count = self.particles_data.len() as u32;
     }
 
     pub fn window(&self) -> &Window {
@@ -471,33 +471,6 @@ impl State {
         source_buffer.destroy();
     }
 
-    fn render_all_particles (&mut self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
-        let buffer_size = self.particles_data.len();
-        let batch_count = (buffer_size + PARTICLE_COUNT - 1) / PARTICLE_COUNT;
-        for i in 0..batch_count {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-            let slice_start = i * PARTICLE_COUNT;
-            self.update_instance_buffer(slice_start);
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..self.instance_count);
-        }
-    }
-
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -505,7 +478,7 @@ impl State {
             label: Some("Render Encoder"),
         });
         {
-            let mut _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -522,8 +495,14 @@ impl State {
                 })],
                 depth_stencil_attachment: None,
             });
+            let buffer_size = self.particles_data.len() as u32;
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..buffer_size);
         }
-        self.render_all_particles(&mut encoder, &view);
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
