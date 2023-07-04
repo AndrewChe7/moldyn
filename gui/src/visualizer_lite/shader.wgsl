@@ -10,7 +10,7 @@ struct VertexInput {
 }
 struct InstanceInput {
     @location(1) position: vec4<f32>,
-    @location(2) mass_id: vec4<f32>,
+    @location(2) mass_radius_id: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -26,7 +26,7 @@ fn vs_main(
     model: VertexInput,
     instance: InstanceInput,
 ) -> VertexOutput {
-    let s = instance.mass_id.x * 0.01;
+    let s = instance.mass_radius_id.y;
     let model_matrix = mat4x4<f32>(
         s, 0.0, 0.0, 0.0,
         0.0, s, 0.0, 0.0,

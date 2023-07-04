@@ -30,7 +30,7 @@ mod tests {
             2.0,
         );
         assert_eq!(res, Err(InitError::ParticleIdDidNotFound));
-        ParticleDatabase::add(0, "test_particle", 1.0);
+        ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
         let res = initializer::initialize_particles_position(
             &mut state,
             0,

@@ -27,6 +27,7 @@ mod tests {
             force: Vector3::new(0.3, 2.2, 1.0),
             potential: 1.0,
             mass: 2.0,
+            radius: 0.2,
             id: 3,
         }
     }
@@ -70,9 +71,9 @@ mod tests {
 
     #[test]
     fn particle_database() {
-        ParticleDatabase::add(0, "test_particle", 0.1337);
-        ParticleDatabase::add(1, "test_particle2", 0.273);
-        ParticleDatabase::add(2, "test_particle3", 0.272);
+        ParticleDatabase::add(0, "test_particle", 0.1337, 0.01337);
+        ParticleDatabase::add(1, "test_particle2", 0.273, 0.0273);
+        ParticleDatabase::add(2, "test_particle3", 0.272, 0.0272);
 
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1337);
         assert_eq!(ParticleDatabase::get_particle_mass(1).unwrap(), 0.273);
@@ -88,7 +89,7 @@ mod tests {
     #[test]
     fn particle_database_multithreaded() {
         let _ = (0..4).into_par_iter().for_each(|i| {
-            ParticleDatabase::add(i, "test_particle", 0.1337);
+            ParticleDatabase::add(i, "test_particle", 0.1337, 0.01337);
         });
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1337);
         assert_eq!(ParticleDatabase::get_particle_mass(1).unwrap(), 0.1337);
@@ -103,7 +104,7 @@ mod tests {
 
     #[test]
     fn save_load_particle_database_from_file() {
-        ParticleDatabase::add(0, "test_particle", 0.1);
+        ParticleDatabase::add(0, "test_particle", 0.1, 0.01);
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1);
         let dir = TempDir::new("test_data").expect("Can't create temp directory");
         let file_path = dir.path().join("test.ron");

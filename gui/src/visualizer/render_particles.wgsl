@@ -2,7 +2,7 @@ struct Particle {
     position: vec4<f64>,
     velocity: vec4<f64>,
     force: vec4<f64>,
-    potential_mass_id: vec4<f64>,
+    potential_mass_radius_id: vec4<f64>,
 };
 
 struct CameraData {
@@ -40,9 +40,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let particle = state[global_id.z];
     let particle_position = particle.position;
     let pos = vec3<f32>(f32(particle_position.x), f32(particle_position.y), f32(particle_position.z));
-    let radius = f32(particle.potential_mass_id.y) * 0.1;
+    let radius = f32(particle.potential_mass_radius_id.z);
     let direction = camera.forward + camera.right * x_relative + camera.up * y_relative;
-    let direction_normalized = normalize(direction.xyz);// / 100.0;
+    let direction_normalized = normalize(direction.xyz);;
     var ray_point = camera.eye.xyz;
     for (var i: i32 = 0; i < 32; i += 1) {
         let distance_to_ball = distance(ray_point, pos) - radius;

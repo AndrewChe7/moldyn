@@ -12,6 +12,7 @@ use std::sync::Mutex;
 struct ParticleData {
     name: String,
     mass: f64,
+    radius: f64,
 }
 
 lazy_static! {
@@ -30,13 +31,14 @@ pub enum SaveLoadError {
 pub struct ParticleDatabase;
 
 impl ParticleDatabase {
-    pub fn add(id: u16, name: &str, mass: f64) {
+    pub fn add(id: u16, name: &str, mass: f64, radius: f64) {
         let mut particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
         particle_data_locked.insert(
             id,
             ParticleData {
                 name: String::from(name),
                 mass,
+                radius,
             },
         );
     }
@@ -45,6 +47,15 @@ impl ParticleDatabase {
         let particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
         if particle_data_locked.contains_key(&id) {
             Some(particle_data_locked.get(&id).unwrap().mass)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_particle_radius(id: u16) -> Option<f64> {
+        let particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
+        if particle_data_locked.contains_key(&id) {
+            Some(particle_data_locked.get(&id).unwrap().radius)
         } else {
             None
         }

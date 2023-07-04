@@ -17,6 +17,8 @@ pub struct Particle {
     pub potential: f64,
     /// Mass of particle
     pub mass: f64,
+    /// Radius of particle
+    pub radius: f64,
     /// ID of particle. Defines type of particle
     pub id: u16,
 }
@@ -33,6 +35,7 @@ impl Particle {
     pub fn new(particle_id: u16, position: Vector3<f64>, velocity: Vector3<f64>) -> Option<Self> {
         ParticleDatabase::get_particle_mass(particle_id)?;
         let mass = ParticleDatabase::get_particle_mass(particle_id).unwrap();
+        let radius = ParticleDatabase::get_particle_radius(particle_id).unwrap();
         Some(Particle {
             position,
             velocity,
@@ -40,6 +43,7 @@ impl Particle {
             potential: 0.0,
             id: particle_id,
             mass,
+            radius,
         })
     }
 }
@@ -53,6 +57,7 @@ impl Default for Particle {
             potential: 0.0,
             id: 0,
             mass: 1.0,
+            radius: 0.1,
         }
     }
 }
@@ -111,8 +116,8 @@ impl State {
 
 impl Default for State {
     fn default() -> Self {
-        ParticleDatabase::add(0, "test_particle", 1.0);
-        ParticleDatabase::add(1, "test_particle1", 3.0);
+        ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
+        ParticleDatabase::add(1, "test_particle1", 3.0, 0.3);
         let p1 = Particle::new(0,
                                Vector3::new(0.0, 0.0, 0.0),
                                Vector3::new(0.0, 0.0, 0.0))

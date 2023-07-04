@@ -30,7 +30,7 @@ struct ParticleData {
     position: [f64; 4],
     velocity: [f64; 4],
     force: [f64; 4],
-    potential_mass_id: [f64; 4],
+    potential_mass_radius_id: [f64; 4],
 }
 
 #[repr(C, align(16))]
@@ -51,7 +51,7 @@ fn particle_data_from_particle(particle: &Particle) -> ParticleData {
         position: [particle.position.x, particle.position.y, particle.position.z, 1.0],
         velocity: [particle.velocity.x, particle.velocity.y, particle.velocity.z, 0.0],
         force: [particle.force.x, particle.force.y, particle.force.z, 0.0],
-        potential_mass_id: [particle.potential, particle.mass, particle.id as f64, 0.0],
+        potential_mass_radius_id: [particle.potential, particle.mass, particle.radius, particle.id as f64],
     }
 }
 
@@ -71,7 +71,7 @@ fn camera_data_from_camera(camera: &Camera) -> CameraData {
 fn particle_data_vector_from_state(state: &moldyn_core::State) -> Vec<ParticleData> {
     let mut res = vec![];
     for particle in &state.particles {
-        let particle = particle.lock().expect("Cann't lock particle");
+        let particle = particle.lock().expect("Can't lock particle");
         let particle_data = particle_data_from_particle(&particle);
         res.push(particle_data);
     }
@@ -550,7 +550,7 @@ impl State {
         let delta_time = 0.0;
         let mut particles_state = moldyn_solver::initializer::initialize_particles(1000,
                                                                                    &Vector3::new(10.0, 10.0, 10.0));
-        ParticleDatabase::add(0, "Argon", 1.0);
+        ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         moldyn_solver::initializer::initialize_particles_position(&mut particles_state,
                                                                   0, 0,
                                                                   (0.0, 0.0, 0.0),
@@ -821,13 +821,14 @@ mod tests {
 
     #[test]
     fn particle_data_converter () {
-        ParticleDatabase::add(0, "test_particle", 1.0);
+        ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
         let particle = Particle::new(0,
                                      Vector3::new(1.0, 2.0, 3.0),
                                      Vector3::new(4.0, 5.0, 6.0)).expect("Can't create particle");
         let pd = particle_data_from_particle(&particle);
-        assert_eq!(pd.potential_mass_id[1], 1.0);
-        assert_eq!(pd.potential_mass_id[2], 0.0);
+        assert_eq!(pd.potential_mass_radius_id[1], 1.0);
+        assert_eq!(pd.potential_mass_radius_id[2], 0.1);
+        assert_eq!(pd.potential_mass_radius_id[3], 0.0);
         assert_eq!(pd.position[0], 1.0);
         assert_eq!(pd.position[1], 2.0);
         assert_eq!(pd.position[2], 3.0);
@@ -840,8 +841,9 @@ mod tests {
     fn particle_data_converter_default () {
         let particle = Particle::default();
         let pd = particle_data_from_particle(&particle);
-        assert_eq!(pd.potential_mass_id[1], 1.0);
-        assert_eq!(pd.potential_mass_id[2], 0.0);
+        assert_eq!(pd.potential_mass_radius_id[1], 1.0);
+        assert_eq!(pd.potential_mass_radius_id[2], 0.1);
+        assert_eq!(pd.potential_mass_radius_id[3], 0.0);
         assert_eq!(pd.position[0], 0.0);
         assert_eq!(pd.position[1], 0.0);
         assert_eq!(pd.position[2], 0.0);
@@ -854,21 +856,23 @@ mod tests {
     fn particle_state_converter () {
         let state = State::default();
         let state_data = particle_data_vector_from_state(&state);
-        assert_eq!(state_data.len(), 2);
+        assert_eq!(state_data.len(), 3);
         let pd = &state_data[0];
-        assert_eq!(pd.potential_mass_id[1], 3.0);
-        assert_eq!(pd.potential_mass_id[2], 1.0);
+        assert_eq!(pd.potential_mass_radius_id[1], 1.0);
+        assert_eq!(pd.potential_mass_radius_id[2], 0.1);
+        assert_eq!(pd.potential_mass_radius_id[3], 0.0);
         assert_eq!(pd.position[0], 0.0);
-        assert_eq!(pd.position[1], 0.5);
+        assert_eq!(pd.position[1], 0.0);
         assert_eq!(pd.position[2], 0.0);
         assert_eq!(pd.velocity[0], 0.0);
         assert_eq!(pd.velocity[1], 0.0);
         assert_eq!(pd.velocity[2], 0.0);
         let pd = &state_data[1];
-        assert_eq!(pd.potential_mass_id[1], 1.0);
-        assert_eq!(pd.potential_mass_id[2], 0.0);
+        assert_eq!(pd.potential_mass_radius_id[1], 3.0);
+        assert_eq!(pd.potential_mass_radius_id[2], 0.3);
+        assert_eq!(pd.potential_mass_radius_id[3], 1.0);
         assert_eq!(pd.position[0], 0.0);
-        assert_eq!(pd.position[1], 0.0);
+        assert_eq!(pd.position[1], 0.5);
         assert_eq!(pd.position[2], 0.0);
         assert_eq!(pd.velocity[0], 0.0);
         assert_eq!(pd.velocity[1], 0.0);
