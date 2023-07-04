@@ -19,5 +19,6 @@ impl Integrator for VerletMethod {
             let acceleration = particle.force / particle.mass;
             particle.velocity += acceleration * delta_time / 2.0;
         });
+        state.apply_boundary_conditions();
     }
 }

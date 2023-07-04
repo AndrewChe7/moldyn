@@ -11,6 +11,7 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use moldyn_core::{Particle, ParticleDatabase};
+use moldyn_solver::solver::Integrator;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 
@@ -105,10 +106,13 @@ pub async fn visualizer_window() {
     }
 
     let mut state = State::new(window).await;
-    let mut particles_state = moldyn_solver::initializer::initialize_particles(1000000, &Vector3::new(100.0, 100.0, 100.0));
-    ParticleDatabase::add(0, "test_particle", 1.0);
+    let mut particles_state = moldyn_solver::initializer::initialize_particles(125, &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
+    ParticleDatabase::add(0, "Argon", 66.335);
+    let lennard_jones = moldyn_solver::solver::LennardJonesPotential::new(0.3418, 1.712);
+    let verlet_method = moldyn_solver::solver::VerletMethod {};
     moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, 0, (0.0, 0.0, 0.0),
-                                                              (100, 100, 100), 1.0).expect("Can't init positions");
+                                                              (5, 5, 5), 3.338339).expect("Can't init positions");
+    moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 66.335);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -143,6 +147,8 @@ pub async fn visualizer_window() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+                verlet_method.calculate(&mut particles_state, 0.002, &lennard_jones);
+                state.update_particle_state(&particles_state);
                 state.update();
                 match state.render() {
                     Ok(_) => {}
@@ -212,8 +218,7 @@ impl CameraUniform {
     pub fn from(camera: &Camera) -> CameraUniform {
         let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
         let aspect = camera.width as f32 / camera.height as f32;
-        let proj = cgmath::perspective(cgmath::Deg(120.0), aspect, 0.01, 100.0);
-        //cgmath::Matrix4::from_translation()
+        let proj = cgmath::perspective(cgmath::Deg(110.0), aspect, 0.01, 100.0);
         let view_proj = proj * view;
         CameraUniform {
             view_pos: [camera.eye.x, camera.eye.y, camera.eye.z, 1.0],

@@ -26,7 +26,7 @@ fn vs_main(
     model: VertexInput,
     instance: InstanceInput,
 ) -> VertexOutput {
-    let s = instance.mass_id.x * 0.1;
+    let s = instance.mass_id.x * 0.01;
     let model_matrix = mat4x4<f32>(
         s, 0.0, 0.0, 0.0,
         0.0, s, 0.0, 0.0,
