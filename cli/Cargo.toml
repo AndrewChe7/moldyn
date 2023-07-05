@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.3.5", features = ["derive"] }
+moldyn_core = { path = "../core" }
+moldyn_solver = { path = "../solver" }
+nalgebra = "0.32.2"

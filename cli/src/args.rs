@@ -7,19 +7,19 @@ use clap::ValueEnum;
 pub struct Args {
     /// path to file with particles data
     #[arg(short, long)]
-    file: PathBuf,
+    pub file: PathBuf,
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Clone, ValueEnum)]
-enum CrystalCellType {
+pub enum CrystalCellType {
     /// uniform grid like in gases
     Uniform,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Commands {
     /// initialize particles state
     Initialize {
         /// path to file
@@ -27,19 +27,21 @@ enum Commands {
         crystal_cell_type: CrystalCellType,
         /// size of this cell
         #[arg(short, long, num_args = 3, value_delimiter = ' ')]
-        size: Vec<f64>,
+        size: Vec<u32>,
+        /// name of particle to initialize
+        #[arg(long)]
+        particle_name: String,
+        /// mass of particle to initialize
+        #[arg(long)]
+        particle_mass: f64,
+        /// radius of particle to initialize
+        #[arg(long)]
+        particle_radius: f64,
+        /// lattice cell
+        #[arg(short, long)]
+        lattice_cell: f64,
+        /// temperature in Kelvin
+        #[arg(short, long)]
+        temperature: f64,
     },
-
-}
-
-pub fn get_args() -> Args {
-    let args = Args::parse();
-    match &args.command {
-        Commands::Initialize {
-            crystal_cell_type, size
-        } => {
-
-        }
-    }
-    args
 }

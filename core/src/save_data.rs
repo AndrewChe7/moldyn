@@ -2,26 +2,62 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Mutex;
+use na::Vector3;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-use crate::{ParticleDatabase, State};
+use crate::{Particle, ParticleDatabase, State};
 use crate::particles_database::ParticleData;
 
 #[derive(Serialize, Deserialize)]
+pub struct ParticleToSave {
+    /// position of particle in 3d space
+    pub position: Vector3<f64>,
+    /// velocity of particle
+    pub velocity: Vector3<f64>,
+    /// ID of particle. Defines type of particle
+    pub id: u16,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StateToSave {
+    pub particles: HashMap<usize, ParticleToSave>,
+    pub boundary_box: Vector3<f64>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct DataFile {
-    pub state: State,
+    pub state: StateToSave,
     pub particles_database: HashMap<u16, ParticleData>,
 }
 
+impl StateToSave {
+    fn from(state: &State) -> Self {
+        let mut particles: HashMap<usize, ParticleToSave> = HashMap::new();
+        let boundary_box = state.boundary_box.clone();
+        for (i, particle) in state.particles.iter().enumerate() {
+            let particle = particle.lock().expect("Can't lock particle");
+            let particle = ParticleToSave {
+                position: particle.position.clone(),
+                velocity: particle.velocity.clone(),
+                id: particle.id.clone(),
+            };
+            particles.insert(i, particle);
+        }
+        Self {
+            particles,
+            boundary_box,
+        }
+    }
+}
+
 pub fn save_data_to_file (state: &State, path: &Path) {
-    let mut particles_database = HashMap::new();
-    {
+    let particles_database = {
         let particle_database = ParticleDatabase::get_data();
         let hash_table = particle_database.lock()
             .expect("Can't lock particles database");
-        particles_database = hash_table.clone();
-    }
-    let state = state.clone();
+        hash_table.clone()
+    };
+    let state = StateToSave::from(state);
     let data = DataFile {
         state,
         particles_database
@@ -42,8 +78,10 @@ pub fn load_data_from_file (state: &mut State, path: &Path) {
     ParticleDatabase::load(&data_file.particles_database);
     state.boundary_box = state.boundary_box;
     state.particles = vec![];
-    for particle in &data_file.state.particles {
-        let particle = particle.lock().expect("Can't lock particle");
-        state.particles.push(Mutex::new(particle.clone()));
+    for (_, particle) in &data_file.state.particles {
+        let particle = Particle::new(particle.id,
+                                     particle.position, particle.velocity)
+            .expect("Can't add particle");
+        state.particles.push(Mutex::new(particle));
     }
 }
