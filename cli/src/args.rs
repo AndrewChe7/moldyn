@@ -6,7 +6,7 @@ use clap::ValueEnum;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// path to file with particles data
-    #[arg(short, long)]
+    #[arg(short = 'f', long)]
     pub file: PathBuf,
     #[command(subcommand)]
     pub command: Commands,
@@ -18,15 +18,33 @@ pub enum CrystalCellType {
     Uniform,
 }
 
+#[derive(Clone, ValueEnum)]
+pub enum IntegratorChoose {
+    /// I think you know what it is
+    VerletMethod,
+    /// Custom method
+    Custom,
+}
+
+#[derive(Clone)]
+pub enum PotentialChoose {
+    /// default 12-6 potential
+    LennardJones,
+    /// Custom potential
+    Custom,
+}
+
+
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// initialize particles state
     Initialize {
-        /// path to file
-        #[arg(short, long)]
+        /// type of crystal cell
+        #[arg(short = 't', long, value_enum)]
         crystal_cell_type: CrystalCellType,
         /// size of this cell
-        #[arg(short, long, num_args = 3, value_delimiter = ' ')]
+        #[arg(short = 's', long, num_args = 3, value_delimiter = ' ')]
         size: Vec<u32>,
         /// name of particle to initialize
         #[arg(long)]
@@ -38,10 +56,25 @@ pub enum Commands {
         #[arg(long)]
         particle_radius: f64,
         /// lattice cell
-        #[arg(short, long)]
+        #[arg(short = 'l', long)]
         lattice_cell: f64,
         /// temperature in Kelvin
-        #[arg(short, long)]
+        #[arg(short = 'T', long)]
         temperature: f64,
+    },
+    /// run solver on particle state
+    Solve {
+        /// file for output
+        #[arg(short = 'o', long)]
+        out_file: PathBuf,
+        /// method of integration
+        #[arg(short = 'i', long)]
+        integrate_method: IntegratorChoose,
+        /// if integrate method is custom, this parameter must be set
+        #[arg(long)]
+        custom_method: Option<String>,
+        /// file with potentials for any id pair
+        #[arg(short = 'p', long)]
+        potentials_file: Option<PathBuf>,
     },
 }

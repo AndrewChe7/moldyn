@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use nalgebra::Vector3;
-use moldyn_core::{ParticleDatabase, save_data_to_file};
-use crate::args::CrystalCellType;
+use moldyn_core::{load_data_from_file, ParticleDatabase, save_data_to_file};
+use moldyn_solver::solver::Integrator;
+use crate::args::{CrystalCellType, IntegratorChoose};
 
 pub fn initialize_uniform(file: &PathBuf,
                           size: &Vec<u32>,
@@ -46,3 +47,20 @@ pub fn initialize(file: &PathBuf,
     }
 }
 
+
+
+pub fn solve(in_file: &PathBuf,
+             out_file: &PathBuf,
+             integrator: &IntegratorChoose,
+             _custom_method: &Option<String>,
+             potentials_file: &Option<PathBuf>) {
+    let state = load_data_from_file(in_file);
+    let integrator = match integrator {
+        IntegratorChoose::VerletMethod => {
+            Integrator::VerletMethod
+        }
+        _ => {
+            todo!()
+        }
+    };
+}

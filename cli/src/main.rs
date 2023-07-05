@@ -1,6 +1,6 @@
 use clap::Parser;
 use crate::args::*;
-use crate::commands::initialize;
+use crate::commands::{initialize, solve};
 
 mod args;
 mod commands;
@@ -19,6 +19,15 @@ fn main() {
         } => {
             initialize(&args.file, crystal_cell_type, size, particle_name,
                        particle_mass, particle_radius, lattice_cell, temperature);
+        }
+        Commands::Solve {
+            out_file,
+            integrate_method,
+            custom_method,
+            potentials_file,
+        } => {
+            solve(&args.file, out_file, integrate_method,
+                  custom_method, potentials_file);
         }
     }
 }

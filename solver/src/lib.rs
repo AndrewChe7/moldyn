@@ -13,7 +13,7 @@ mod tests {
     use crate::macro_parameters::{
         get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_thermal_energy,
     };
-    use crate::solver::{update_force, Integrator, LennardJonesPotential, Potential, VerletMethod};
+    use crate::solver::{update_force, Integrator, Potential};
     use moldyn_core::{Particle, ParticleDatabase, State};
     use na::Vector3;
     use std::sync::Mutex;
@@ -57,13 +57,14 @@ mod tests {
 
     #[test]
     fn lennard_jones() {
-        let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
+        let lennard_jones_potential = Potential::new_lennard_jones(0.3418, 1.712);
+        let (potential, force) = lennard_jones_potential.get_potential_and_force(0.5);
         assert_eq!(
-            format!("{:.8}", lennard_jones_potential.get_potential(0.5)),
+            format!("{:.8}", potential),
             "-0.59958655"
         );
         assert_eq!(
-            format!("{:.8}", lennard_jones_potential.get_force(0.5)),
+            format!("{:.8}", force),
             "6.67445797"
         );
     }
@@ -77,8 +78,7 @@ mod tests {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
-        update_force(&mut state, &lennard_jones_potential);
+        update_force(&mut state);
         let force_p1 = &state.particles[0]
             .lock()
             .expect("Can't lock particle")
@@ -102,9 +102,8 @@ mod tests {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        let lennard_jones_potential = LennardJonesPotential::new(0.3418, 1.712);
-        let verlet = VerletMethod;
-        update_force(&mut state, &lennard_jones_potential); // Initialize forces
+        let verlet = Integrator::VerletMethod;
+        update_force(&mut state); // Initialize forces
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
@@ -139,7 +138,7 @@ mod tests {
             assert_eq!(format!("{:.8}", f2.y), "0.00000000");
             assert_eq!(format!("{:.8}", f2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, &lennard_jones_potential);
+        verlet.calculate(&mut state, 0.002);
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
@@ -189,7 +188,7 @@ mod tests {
             particles: vec![Mutex::new(p1), Mutex::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        update_force(&mut state, &LennardJonesPotential::new(0.3418, 1.712));
+        update_force(&mut state);
         let mv = get_center_of_mass_velocity(&state, 0, 2);
         assert_eq!(mv, Vector3::new(0.0, 1.0, 0.0));
         assert_eq!(

@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Mutex;
 use na::Vector3;
 use ron::ser::PrettyConfig;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use crate::{Particle, ParticleDatabase, State};
 use crate::particles_database::ParticleData;
 
@@ -20,6 +20,7 @@ pub struct ParticleToSave {
 
 #[derive(Serialize, Deserialize)]
 pub struct StateToSave {
+    #[serde(serialize_with = "ordered_map")]
     pub particles: HashMap<usize, ParticleToSave>,
     pub boundary_box: Vector3<f64>,
 }
@@ -27,7 +28,18 @@ pub struct StateToSave {
 #[derive(Serialize, Deserialize)]
 pub struct DataFile {
     pub state: StateToSave,
+    #[serde(serialize_with = "ordered_map")]
     pub particles_database: HashMap<u16, ParticleData>,
+}
+
+fn ordered_map<S, K, V>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        K: Serialize + Ord,
+        V: Serialize,
+{
+    let ordered: BTreeMap<_, _> = value.iter().collect();
+    ordered.serialize(serializer)
 }
 
 impl StateToSave {
@@ -72,7 +84,11 @@ pub fn save_data_to_file (state: &State, path: &Path) {
         .expect("Can't save data to file");
 }
 
-pub fn load_data_from_file (state: &mut State, path: &Path) {
+pub fn load_data_from_file (path: &Path) -> State {
+    let mut state = State {
+        particles: vec![],
+        boundary_box: Default::default(),
+    };
     let file = File::open(path).expect("Can't open file to read");
     let data_file: DataFile = ron::de::from_reader(&file).expect("Can't read file");
     ParticleDatabase::load(&data_file.particles_database);
@@ -84,4 +100,5 @@ pub fn load_data_from_file (state: &mut State, path: &Path) {
             .expect("Can't add particle");
         state.particles.push(Mutex::new(particle));
     }
+    state
 }

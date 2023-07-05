@@ -100,8 +100,8 @@ pub async fn visualizer_window() {
     let mut state = State::new(window).await;
     let mut particles_state = moldyn_solver::initializer::initialize_particles(125, &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-    let lennard_jones = moldyn_solver::solver::LennardJonesPotential::new(0.3418, 1.712);
-    let verlet_method = moldyn_solver::solver::VerletMethod {};
+    let lennard_jones = moldyn_solver::solver::Potential::new_lennard_jones(0.3418, 1.712);
+    let verlet_method = Integrator::VerletMethod;
     moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, 0, (0.0, 0.0, 0.0),
                                                               (5, 5, 5), 3.338339).expect("Can't init positions");
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 66.335);
@@ -139,7 +139,7 @@ pub async fn visualizer_window() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-                verlet_method.calculate(&mut particles_state, 0.002, &lennard_jones);
+                verlet_method.calculate(&mut particles_state, 0.002);
                 state.update_particle_state(&particles_state);
                 state.update();
                 match state.render() {
