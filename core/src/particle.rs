@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 /// Structure that keeps all data for particle
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Particle {
     /// position of particle in 3d space
     pub position: Vector3<f64>,
@@ -58,6 +58,22 @@ impl Default for Particle {
             id: 0,
             mass: 1.0,
             radius: 0.1,
+        }
+    }
+}
+
+impl Clone for State {
+    fn clone(&self) -> Self {
+        let boundary_box = self.boundary_box.clone();
+        let mut particles: Vec<Mutex<Particle>> = vec![];
+        for particle in &self.particles {
+            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.clone();
+            particles.push(Mutex::new(particle));
+        }
+        Self {
+            particles,
+            boundary_box,
         }
     }
 }

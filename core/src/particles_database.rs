@@ -8,11 +8,11 @@ use std::path::Path;
 use std::string::String;
 use std::sync::Mutex;
 
-#[derive(Serialize, Deserialize)]
-struct ParticleData {
-    name: String,
-    mass: f64,
-    radius: f64,
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ParticleData {
+    pub name: String,
+    pub mass: f64,
+    pub radius: f64,
 }
 
 lazy_static! {
@@ -50,6 +50,10 @@ impl ParticleDatabase {
         } else {
             None
         }
+    }
+
+    pub fn get_data() -> &'static Mutex<HashMap<u16, ParticleData>> {
+        &PARTICLE_DATA
     }
 
     pub fn get_particle_radius(id: u16) -> Option<f64> {
@@ -116,5 +120,12 @@ impl ParticleDatabase {
             }
         }
         Ok(())
+    }
+
+    pub fn load(particle_database: &HashMap<u16, ParticleData>) {
+        for (id, particle) in particle_database {
+            ParticleDatabase::add(id.clone(), particle.name.as_str(),
+                                  particle.mass.clone(), particle.radius.clone());
+        }
     }
 }

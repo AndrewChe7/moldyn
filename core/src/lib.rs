@@ -1,5 +1,7 @@
 mod particle;
 mod particles_database;
+mod save_data;
+
 extern crate lazy_static;
 extern crate nalgebra as na;
 extern crate rayon;
@@ -8,6 +10,7 @@ extern crate serde;
 pub use particle::Particle;
 pub use particle::State;
 pub use particles_database::ParticleDatabase;
+pub use save_data::*;
 
 pub const K_B: f64 = 1.380648528;
 
