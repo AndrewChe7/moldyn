@@ -25,9 +25,11 @@ fn main() {
             integrate_method,
             custom_method,
             potentials_file,
+            iteration_count,
+            delta_time,
         } => {
             solve(&args.file, out_file, integrate_method,
-                  custom_method, potentials_file);
+                  custom_method, potentials_file, iteration_count, delta_time);
         }
     }
 }

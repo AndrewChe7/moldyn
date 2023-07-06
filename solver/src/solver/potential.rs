@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 use rand_distr::num_traits::Pow;
-use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -123,7 +122,7 @@ pub fn update_force(state: &mut State) {
     });
 }
 
-pub fn save_to_file (path: &PathBuf) {
+pub fn save_potentials_to_file (path: &PathBuf) {
     let db = POTENTIALS_DATA.lock()
         .expect("Can't lock potentials database");
     let file = if path.exists() {
@@ -131,13 +130,13 @@ pub fn save_to_file (path: &PathBuf) {
     } else {
         File::create(path).expect("Can't create file")
     };
-    ron::ser::to_writer_pretty(file, &db.clone(), PrettyConfig::default())
+    serde_json::ser::to_writer_pretty(file, &db.clone())
         .expect("Can't save potential settings");
 }
 
-pub fn load_from_file (path: &PathBuf) {
+pub fn load_potentials_from_file (path: &PathBuf) {
     let file = File::open(path).expect("Can't open file");
-    let data: HashMap<(u16, u16), Potential> = ron::de::from_reader(&file)
+    let data: HashMap<(u16, u16), Potential> = serde_json::de::from_reader(&file)
         .expect("Can't load data from file");
     let mut db = POTENTIALS_DATA.lock()
         .expect("Can't lock potentials database");

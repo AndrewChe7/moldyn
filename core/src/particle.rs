@@ -1,11 +1,10 @@
 use crate::ParticleDatabase;
 use na::Vector3;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 /// Structure that keeps all data for particle
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug)]
 pub struct Particle {
     /// position of particle in 3d space
     pub position: Vector3<f64>,
@@ -24,7 +23,6 @@ pub struct Particle {
 }
 
 /// Structure that keeps current state
-#[derive(Serialize, Deserialize)]
 pub struct State {
     pub particles: Vec<Mutex<Particle>>,
     pub boundary_box: Vector3<f64>,

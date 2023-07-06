@@ -1,5 +1,4 @@
 use lazy_static::lazy_static;
-use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -92,7 +91,7 @@ impl ParticleDatabase {
         {
             let particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
             let data = &*particle_data_locked;
-            let res = ron::ser::to_writer_pretty(file, data, PrettyConfig::default());
+            let res = serde_json::ser::to_writer_pretty(file, data);
             if res.is_err() {
                 return Err(SaveLoadError::CantWrite);
             }
@@ -106,7 +105,7 @@ impl ParticleDatabase {
             return Err(SaveLoadError::CantOpen);
         }
         let file = file.unwrap();
-        let res = ron::de::from_reader(file);
+        let res = serde_json::de::from_reader(file);
         if res.is_err() {
             return Err(SaveLoadError::CantRead);
         }

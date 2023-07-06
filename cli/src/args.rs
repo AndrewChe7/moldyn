@@ -26,16 +26,6 @@ pub enum IntegratorChoose {
     Custom,
 }
 
-#[derive(Clone)]
-pub enum PotentialChoose {
-    /// default 12-6 potential
-    LennardJones,
-    /// Custom potential
-    Custom,
-}
-
-
-
 #[derive(Subcommand)]
 pub enum Commands {
     /// initialize particles state
@@ -76,5 +66,11 @@ pub enum Commands {
         /// file with potentials for any id pair
         #[arg(short = 'p', long)]
         potentials_file: Option<PathBuf>,
+        /// how much iterations to count
+        #[arg(short = 'c', long)]
+        iteration_count: usize,
+        /// how long each iteration should take
+        #[arg(short = 't', long)]
+        delta_time: f64,
     },
 }

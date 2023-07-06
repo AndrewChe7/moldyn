@@ -16,7 +16,7 @@ pub const K_B: f64 = 1.380648528;
 
 #[cfg(test)]
 mod tests {
-    use crate::{Particle, ParticleDatabase, State};
+    use crate::{Particle, ParticleDatabase, ParticleToSave, State, StateToSave};
     use na::Vector3;
     use rand::Rng;
     use rayon::prelude::*;
@@ -24,22 +24,14 @@ mod tests {
     use std::sync::Mutex;
 
     fn test_particle() -> Particle {
-        Particle {
-            position: Vector3::new(0.1, 0.2, 0.3),
-            velocity: Vector3::new(0.1, 0.2, 0.3),
-            force: Vector3::new(0.3, 2.2, 1.0),
-            potential: 1.0,
-            mass: 2.0,
-            radius: 0.2,
-            id: 3,
-        }
+        ParticleDatabase::add(3, "test", 2.0, 0.2);
+        Particle::new(3, Vector3::new(0.1, 0.2, 0.3),
+                      Vector3::new(0.1, 0.2, 0.3)).unwrap()
     }
 
     fn check_particle_equality(p1: &Particle, p2: &Particle) {
         assert_eq!(p1.position, p2.position);
         assert_eq!(p1.velocity, p2.velocity);
-        assert_eq!(p1.force, p2.force);
-        assert_eq!(p1.potential, p2.potential);
         assert_eq!(p1.mass, p2.mass);
         assert_eq!(p1.id, p2.id);
     }
@@ -47,25 +39,24 @@ mod tests {
     #[test]
     fn particle_serialization() {
         let particle = test_particle();
-
-        let serialized = ron::to_string(&particle).unwrap();
-        let deserialized: Particle = ron::from_str(&serialized).unwrap();
-
-        check_particle_equality(&particle, &deserialized);
+        let particle_data_to_save = ParticleToSave::from(&particle);
+        let serialized = serde_json::to_string(&particle_data_to_save).unwrap();
+        let deserialized_data: ParticleToSave = serde_json::from_str(&serialized).unwrap();
+        let converted: Particle = (&deserialized_data).into().unwrap();
+        check_particle_equality(&particle, &converted);
     }
 
     #[test]
     fn state_serialization() {
         let particle = test_particle();
-
         let state = State {
             particles: vec![Mutex::new(test_particle()), Mutex::new(test_particle())],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-
-        let serialized = ron::to_string(&state).unwrap();
-        let deserialized: State = ron::from_str(&serialized).unwrap();
-
+        let state_data_to_save = StateToSave::from(&state);
+        let serialized = serde_json::to_string(&state_data_to_save).unwrap();
+        let deserialized: StateToSave = serde_json::from_str(&serialized).unwrap();
+        let deserialized: State = (&deserialized).into();
         for p in &deserialized.particles {
             let ref p = p.lock().expect("Can't lock particle");
             check_particle_equality(p, &particle);
