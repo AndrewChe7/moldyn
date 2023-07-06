@@ -206,7 +206,7 @@ impl DataFile {
     }
 
     pub fn get_last_frame(&self) -> State {
-        let last_frame_number = self.start_frame + self.frame_count;
+        let last_frame_number = self.start_frame + self.frame_count - 1;
         let last_frame = self.frames.get(&last_frame_number)
             .expect("Can't get frame");
         last_frame.into()

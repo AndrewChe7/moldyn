@@ -37,13 +37,13 @@ pub enum Commands {
         #[arg(short = 's', long, num_args = 3, value_delimiter = ' ')]
         size: Vec<u32>,
         /// name of particle to initialize
-        #[arg(long)]
+        #[arg(short = 'n', long)]
         particle_name: String,
         /// mass of particle to initialize
-        #[arg(long)]
+        #[arg(short = 'm', long)]
         particle_mass: f64,
         /// radius of particle to initialize
-        #[arg(long)]
+        #[arg(short = 'r', long)]
         particle_radius: f64,
         /// lattice cell
         #[arg(short = 'l', long)]
