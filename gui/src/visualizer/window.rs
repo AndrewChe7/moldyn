@@ -20,9 +20,26 @@ const HEIGHT: u32= 1080;
 const PARTICLE_COUNT: usize = 512;
 
 const VERTICES: &[[f32; 3]] = &[[0.000000, 1.000000, 0.000000], [0.894427, 0.447214, 0.000000], [0.276393, 0.447214, 0.850651], [-0.723607, 0.447214, 0.525731], [-0.723607, 0.447214, -0.525731], [0.276393, 0.447214, -0.850651], [0.723607, -0.447214, -0.525731], [0.723607, -0.447214, 0.525731], [-0.276393, -0.447214, 0.850651], [-0.894427, -0.447214, 0.000000], [-0.276393, -0.447214, -0.850651], [0.000000, -1.000000, 0.000000], [0.111471, 0.932671, 0.343074], [0.207932, 0.739749, 0.639950], [-0.291836, 0.932671, 0.212031], [-0.544374, 0.739749, 0.395511], [-0.291836, 0.932671, -0.212031], [-0.544374, 0.739749, -0.395511], [0.111471, 0.932671, -0.343074], [0.207932, 0.739749, -0.639950], [0.672883, 0.739749, 0.000000], [0.360729, 0.932671, 0.000000], [0.568661, 0.516806, 0.639950], [0.784354, 0.516806, 0.343074], [-0.432902, 0.516806, 0.738584], [-0.083904, 0.516806, 0.851981], [-0.836210, 0.516806, -0.183479], [-0.836210, 0.516806, 0.183479], [-0.083904, 0.516806, -0.851981], [-0.432902, 0.516806, -0.738584], [0.784354, 0.516806, -0.343074], [0.568661, 0.516806, -0.639950], [0.964719, 0.156077, -0.212031], [0.905103, -0.156077, -0.395511], [0.499768, 0.156077, 0.851981], [0.655845, -0.156077, 0.738584], [-0.655845, 0.156077, 0.738584], [-0.499768, -0.156077, 0.851981], [-0.905103, 0.156077, -0.395511], [-0.964719, -0.156077, -0.212031], [0.096461, 0.156077, -0.983024], [-0.096461, -0.156077, -0.983024], [0.655845, -0.156077, -0.738584], [0.499768, 0.156077, -0.851981], [0.905103, -0.156077, 0.395511], [0.964719, 0.156077, 0.212031], [-0.096461, -0.156077, 0.983024], [0.096461, 0.156077, 0.983024], [-0.964719, -0.156077, 0.212031], [-0.905103, 0.156077, 0.395511], [-0.499768, -0.156077, -0.851981], [-0.655845, 0.156077, -0.738584], [0.432902, -0.516806, -0.738584], [0.083904, -0.516806, -0.851981], [0.836210, -0.516806, 0.183479], [0.836210, -0.516806, -0.183479], [0.083904, -0.516806, 0.851981], [0.432902, -0.516806, 0.738584], [-0.784354, -0.516806, 0.343074], [-0.568661, -0.516806, 0.639950], [-0.568661, -0.516806, -0.639950], [-0.784354, -0.516806, -0.343074], [-0.111471, -0.932671, -0.343074], [-0.207932, -0.739749, -0.639950], [0.544374, -0.739749, -0.395511], [0.291836, -0.932671, -0.212031], [0.544374, -0.739749, 0.395511], [0.291836, -0.932671, 0.212031], [-0.207932, -0.739749, 0.639950], [-0.111471, -0.932671, 0.343074], [-0.672883, -0.739749, 0.000000], [-0.360729, -0.932671, 0.000000], [0.487677, 0.789079, 0.373531], [-0.204548, 0.789079, 0.579236], [-0.614095, 0.789079, -0.015543], [-0.174983, 0.789079, -0.588843], [0.505950, 0.789079, -0.348381], [0.802301, 0.196377, -0.563693], [0.784028, 0.196377, 0.588842], [-0.317744, 0.196377, 0.927618], [-0.980405, 0.196377, -0.015543], [-0.288179, 0.196377, -0.937224], [0.317744, -0.196377, -0.927618], [0.980405, -0.196377, 0.015543], [0.288179, -0.196377, 0.937224], [-0.802301, -0.196377, 0.563693], [-0.784028, -0.196377, -0.588842], [0.204548, -0.789079, -0.579236], [0.614095, -0.789079, 0.015543], [0.174983, -0.789079, 0.588842], [-0.505950, -0.789079, 0.348381], [-0.487677, -0.789079, -0.373531], ];
-
-
 const INDICES: &[u16] = &[0, 12, 21, 2, 22, 13, 1, 20, 23, 13, 72, 12, 23, 72, 22, 21, 72, 20, 12, 72, 21, 22, 72, 13, 20, 72, 23, 0, 14, 12, 3, 24, 15, 2, 13, 25, 15, 73, 14, 25, 73, 24, 12, 73, 13, 14, 73, 12, 24, 73, 15, 13, 73, 25, 0, 16, 14, 4, 26, 17, 3, 15, 27, 17, 74, 16, 27, 74, 26, 14, 74, 15, 16, 74, 14, 26, 74, 17, 15, 74, 27, 0, 18, 16, 5, 28, 19, 4, 17, 29, 19, 75, 18, 29, 75, 28, 16, 75, 17, 18, 75, 16, 28, 75, 19, 17, 75, 29, 0, 21, 18, 1, 30, 20, 5, 19, 31, 20, 76, 21, 31, 76, 30, 18, 76, 19, 21, 76, 18, 30, 76, 20, 19, 76, 31, 5, 31, 43, 1, 32, 30, 6, 42, 33, 30, 77, 31, 33, 77, 32, 43, 77, 42, 31, 77, 43, 32, 77, 30, 42, 77, 33, 1, 23, 45, 2, 34, 22, 7, 44, 35, 22, 78, 23, 35, 78, 34, 45, 78, 44, 23, 78, 45, 34, 78, 22, 44, 78, 35, 2, 25, 47, 3, 36, 24, 8, 46, 37, 24, 79, 25, 37, 79, 36, 47, 79, 46, 25, 79, 47, 36, 79, 24, 46, 79, 37, 3, 27, 49, 4, 38, 26, 9, 48, 39, 26, 80, 27, 39, 80, 38, 49, 80, 48, 27, 80, 49, 38, 80, 26, 48, 80, 39, 4, 29, 51, 5, 40, 28, 10, 50, 41, 28, 81, 29, 41, 81, 40, 51, 81, 50, 29, 81, 51, 40, 81, 28, 50, 81, 41, 5, 43, 40, 6, 52, 42, 10, 41, 53, 42, 82, 43, 53, 82, 52, 40, 82, 41, 43, 82, 40, 52, 82, 42, 41, 82, 53, 1, 45, 32, 7, 54, 44, 6, 33, 55, 44, 83, 45, 55, 83, 54, 32, 83, 33, 45, 83, 32, 54, 83, 44, 33, 83, 55, 2, 47, 34, 8, 56, 46, 7, 35, 57, 46, 84, 47, 57, 84, 56, 34, 84, 35, 47, 84, 34, 56, 84, 46, 35, 84, 57, 3, 49, 36, 9, 58, 48, 8, 37, 59, 48, 85, 49, 59, 85, 58, 36, 85, 37, 49, 85, 36, 58, 85, 48, 37, 85, 59, 4, 51, 38, 10, 60, 50, 9, 39, 61, 50, 86, 51, 61, 86, 60, 38, 86, 39, 51, 86, 38, 60, 86, 50, 39, 86, 61, 10, 53, 63, 6, 64, 52, 11, 62, 65, 52, 87, 53, 65, 87, 64, 63, 87, 62, 53, 87, 63, 64, 87, 52, 62, 87, 65, 6, 55, 64, 7, 66, 54, 11, 65, 67, 54, 88, 55, 67, 88, 66, 64, 88, 65, 55, 88, 64, 66, 88, 54, 65, 88, 67, 7, 57, 66, 8, 68, 56, 11, 67, 69, 56, 89, 57, 69, 89, 68, 66, 89, 67, 57, 89, 66, 68, 89, 56, 67, 89, 69, 8, 59, 68, 9, 70, 58, 11, 69, 71, 58, 90, 59, 71, 90, 70, 68, 90, 69, 59, 90, 68, 70, 90, 58, 69, 90, 71, 9, 61, 70, 10, 63, 60, 11, 71, 62, 60, 91, 61, 62, 91, 63, 70, 91, 71, 61, 91, 70, 63, 91, 60, 71, 91, 62, ];
+
+const BOX_VERTICES: &[[f32; 3]] = &[
+    [0.0, 1.0, 1.0],
+    [0.0, 0.0, 1.0],
+    [1.0, 1.0, 1.0],
+    [1.0, 0.0, 1.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [1.0, 1.0, 0.0],
+    [1.0, 0.0, 0.0],
+];
+const BOX_INDICES: &[u16] = &[
+    0, 2, 3, 0, 3, 1,
+    2, 6, 7, 2, 7, 3,
+    6, 4, 5, 6, 5, 7,
+    4, 0, 1, 4, 1, 5,
+    0, 4, 6, 0, 6, 2,
+    1, 5, 7, 1, 7, 3,
+];
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
@@ -38,6 +55,12 @@ struct CameraUniform {
     view_proj: [[f32; 4]; 4],
 }
 
+#[repr(C, align(16))]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct BoundingBox {
+    size: [f32; 4],
+}
+
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -49,6 +72,7 @@ struct State {
     camera_controller: CameraController,
     particles_data: Vec<ParticleDataLite>,
     particles_center: (f32, f32, f32),
+    particles_bounding_box: BoundingBox,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
@@ -56,6 +80,11 @@ struct State {
     instance_buffer: wgpu::Buffer,
     instance_count: u32,
     render_pipeline: wgpu::RenderPipeline,
+    bounding_box_buffer: wgpu::Buffer,
+    bounding_box_index_buffer: wgpu::Buffer,
+    bounding_box_uniform_buffer: wgpu::Buffer,
+    bounding_box_bind_group: wgpu::BindGroup,
+    bounding_box_render_pipeline: wgpu::RenderPipeline,
     depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
     depth_texture_sampler: wgpu::Sampler,
@@ -158,6 +187,14 @@ pub async fn visualizer_window() {
             _ => {}
         }
     });
+}
+
+impl BoundingBox {
+    pub fn from(state: &moldyn_core::State) -> Self {
+        Self {
+            size: [state.boundary_box.x as f32, state.boundary_box.y as f32, state.boundary_box.z as f32, 0.0],
+        }
+    }
 }
 
 impl ParticleDataLite {
@@ -282,18 +319,21 @@ impl State {
             contents: bytemuck::cast_slice(&[camera_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+        let bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        };
         let camera_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
+                entries: &[
+                    bind_group_layout_entry.clone(),
+                ],
                 label: Some("camera_bind_group_layout"),
             });
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -357,6 +397,7 @@ impl State {
                 multiview: None,
             }
         );
+
         let particles_state = moldyn_solver::initializer::initialize_particles(PARTICLE_COUNT, &Vector3::zeros());
         let mut instances = vec![];
         for particle in &particles_state.particles {
@@ -378,6 +419,102 @@ impl State {
             contents: bytemuck::cast_slice(INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
+        let bb_uniform_data = BoundingBox::from(&particles_state);
+        let bounding_box_uniform_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("BB Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[bb_uniform_data]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+        let bounding_box_bind_group_layout = device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                label: Some("Bounding Box Uniform Bind Group Layout"),
+                entries: &[
+                    bind_group_layout_entry.clone(),
+                ],
+            }
+        );
+        let bounding_box_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: Some("BB Uniform Bind Group"),
+                layout: &bounding_box_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: bounding_box_uniform_buffer.as_entire_binding(),
+                    }
+                ],
+            }
+        );
+        let bounding_box_render_pipeline_layout = device.create_pipeline_layout(
+            &wgpu::PipelineLayoutDescriptor {
+                label: Some("BB Render Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout, &bounding_box_bind_group_layout],
+                push_constant_ranges: &[],
+            }
+        );
+        let bb_shader = device.create_shader_module(wgpu::include_wgsl!("bounding_box.wgsl"));
+        let bounding_box_render_pipeline = device.create_render_pipeline(
+            &RenderPipelineDescriptor {
+                label: Some("BB Render pipeline"),
+                layout: Some(&bounding_box_render_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &bb_shader,
+                    entry_point: "vs_main",
+                    buffers: &[vertex_desc()],
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    // Setting this to anything other than Fill requires Features::POLYGON_MODE_LINE
+                    // or Features::POLYGON_MODE_POINT
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    // Requires Features::DEPTH_CLIP_CONTROL
+                    unclipped_depth: false,
+                    // Requires Features::CONSERVATIVE_RASTERIZATION
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &bb_shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                multiview: None,
+            }
+        );
+        let bounding_box_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("BB Vertex Buffer"),
+                contents: bytemuck::cast_slice(BOX_VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        let bounding_box_index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("BB Index Buffer"),
+                contents: bytemuck::cast_slice(BOX_INDICES),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
         let (depth_texture, depth_texture_view, depth_texture_sampler) =
             Self::create_depth_texture(&device, &config, "depth texture");
         Self {
@@ -391,6 +528,7 @@ impl State {
             camera_controller,
             particles_data: vec![],
             particles_center: (0.0, 0.0, 0.0),
+            particles_bounding_box: bb_uniform_data,
             camera_buffer,
             camera_bind_group,
             vertex_buffer,
@@ -398,6 +536,11 @@ impl State {
             instance_buffer,
             instance_count: 0,
             render_pipeline,
+            bounding_box_buffer,
+            bounding_box_index_buffer,
+            bounding_box_uniform_buffer,
+            bounding_box_bind_group,
+            bounding_box_render_pipeline,
             depth_texture,
             depth_texture_view,
             depth_texture_sampler,
@@ -417,7 +560,27 @@ impl State {
         }
         self.particles_data = data;
         self.particles_center = center;
+        self.particles_bounding_box = BoundingBox::from(&state);
         self.update_instance_buffer();
+        self.update_bounding_box_uniform_buffer();
+    }
+
+    fn update_bounding_box_uniform_buffer (&mut self) {
+        let source_buffer = self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("BB Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[self.particles_bounding_box]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC,
+            }
+        );
+        let mut command_encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Loader")
+            });
+        command_encoder.copy_buffer_to_buffer(&source_buffer, 0,
+                                              &self.bounding_box_uniform_buffer, 0,
+                                              mem::size_of::<BoundingBox>() as wgpu::BufferAddress);
+        self.queue.submit(Some(command_encoder.finish()));
     }
 
     fn update_instance_buffer (&mut self) {
@@ -553,6 +716,13 @@ impl State {
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..buffer_size);
+            // Bounding box
+            render_pass.set_pipeline(&self.bounding_box_render_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.bounding_box_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.bounding_box_buffer.slice(..));
+            render_pass.set_index_buffer(self.bounding_box_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..BOX_INDICES.len() as u32, 0, 0..1);
         }
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
