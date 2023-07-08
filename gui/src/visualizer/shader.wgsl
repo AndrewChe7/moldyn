@@ -1,29 +1,59 @@
+struct Camera {
+    view_pos: vec4<f32>,
+    view_proj: mat4x4<f32>,
+}
+@group(0) @binding(0)
+var<uniform> camera: Camera;
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+}
+struct InstanceInput {
+    @location(1) position: vec4<f32>,
+    @location(2) mass_radius_id: vec4<f32>,
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0)      uv: vec2<f32>,
-};
+    @location(0) sphere_center: vec4<f32>,
+    @location(1) world_position: vec4<f32>,
+    @location(2) radius: f32,
+    @location(3) color: vec4<f32>,
+}
 
 @vertex
 fn vs_main(
-    @builtin(vertex_index) in_vertex_index: u32,
+    model: VertexInput,
+    instance: InstanceInput,
 ) -> VertexOutput {
+    let s = instance.mass_radius_id.y;
+    let model_matrix = mat4x4<f32>(
+        s, 0.0, 0.0, 0.0,
+        0.0, s, 0.0, 0.0,
+        0.0, 0.0, s, 0.0,
+        instance.position.x, instance.position.y, instance.position.z, 1.0
+    );
     var out: VertexOutput;
-    let i = in_vertex_index;
-    let x = select(-1.0, 1.0, i == 2u || i == 3u || i == 5u);
-    let y = select(-1.0, 1.0, i == 0u || i == 2u || i == 3u);
-    out.clip_position = vec4<f32>(x, y, 0.0, 1.0);
-    out.uv = (vec2<f32>(x, -y) + 1.0) * 0.5;
+    var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
+    out.clip_position = camera.view_proj * world_position;
+    out.world_position = world_position;
+    out.sphere_center = instance.position;
+    out.radius = distance(world_position.xyz, instance.position.xyz);
+    out.color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     return out;
 }
 
-@group(0)
-@binding(0)
-var screen_texture : texture_2d<f32>;
-@group(0)
-@binding(1)
-var screen_sampler: sampler;
+// Fragment shader
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(screen_texture, screen_sampler, in.uv);
+    var c = 0.01;
+    let normal = normalize(in.world_position - in.sphere_center).xyz;
+    let pos = in.sphere_center.xyz + normal * in.radius;
+    let view_vector = normalize(camera.view_pos.xyz - pos);
+    let light_dir = -normalize(vec3<f32>(1.0, -1.0, 1.0));
+    c += pow(max(dot(normal, light_dir), 0.0), 3.0);
+    let half_dir = normalize(view_vector + light_dir);
+    c += pow(max(dot(normal, half_dir), 0.0), 32.0);
+    return vec4<f32>(in.color.xyz + c, 1.0);
 }

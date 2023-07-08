@@ -94,7 +94,6 @@ pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
 
 pub fn update_force(state: &mut State) {
     let number_particles = state.particles.len();
-    let volume = state.boundary_box.x * state.boundary_box.y * state.boundary_box.z;
     state.particles.par_iter_mut().for_each(|particle| {
         let particle = particle.get_mut().expect("Can't lock particle");
         particle.force.x = 0.0;
@@ -121,7 +120,6 @@ pub fn update_force(state: &mut State) {
                 let p2 = &mut state.particles[j].lock().expect("Can't lock particle");
                 p2.force -= force_vec;
                 p2.potential += potential;
-                // p2.temp += t;
             }
         }
     });

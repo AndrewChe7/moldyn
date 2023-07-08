@@ -4,11 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "moldyn_gui_lite"
-path = "src/main_lite.rs"
-
-[[bin]]
-name = "moldyn_gui_ray"
+name = "moldyn_gui"
 path = "src/main.rs"
 
 [lib]
