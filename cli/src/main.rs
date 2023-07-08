@@ -2,10 +2,13 @@ use clap::Parser;
 use crate::args::*;
 use crate::commands::{initialize, solve};
 
+#[macro_use]
+extern crate log;
 mod args;
 mod commands;
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
     match &args.command {
         Commands::Initialize {

@@ -5,14 +5,14 @@ extern crate rayon;
 pub mod initializer;
 pub mod macro_parameters;
 pub mod solver;
+#[macro_use]
+extern crate log;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::initializer::InitError;
-    use crate::macro_parameters::{
-        get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_thermal_energy,
-    };
+    use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_pressure, get_temperature, get_thermal_energy};
     use crate::solver::{update_force, Integrator, Potential};
     use moldyn_core::{Particle, ParticleDatabase, State};
     use na::Vector3;
@@ -191,17 +191,77 @@ mod tests {
         update_force(&mut state);
         let mv = get_center_of_mass_velocity(&state, 0, 2);
         assert_eq!(mv, Vector3::new(0.0, 1.0, 0.0));
+        let e_kinetic = get_kinetic_energy(&state, 0, 2);
+        let e_thermal = get_thermal_energy(&state, 0, 2, &mv);
+        let e_potential = get_potential_energy(&state, 0, 2);
+        let e = e_kinetic + e_potential;
+        let e_internal = e_thermal + e_potential;
         assert_eq!(
-            format!("{:.8}", get_kinetic_energy(&state, 0, 2)),
+            format!("{:.8}", e_kinetic),
             "132.67000000"
         );
         assert_eq!(
-            format!("{:.8}", get_thermal_energy(&state, 0, 2, &mv)),
+            format!("{:.8}", e_thermal),
             "66.33500000"
         );
         assert_eq!(
-            format!("{:.8}", get_potential_energy(&state, 0, 2)),
+            format!("{:.8}", e_potential),
             "-0.59958655"
+        );
+        assert_eq!(
+            format!("{:.8}", e_internal),
+            "65.73541345"
+        );
+        assert_eq!(
+            format!("{:.8}", e),
+            "132.07041345"
+        );
+    }
+
+    #[test]
+    fn temperature() {
+        let mut p1 = Particle::default();
+        let mut p2 = Particle::default();
+        p1.position = Vector3::new(0.75, 0.75, 0.5);
+        p2.position = Vector3::new(1.25, 0.75, 0.5);
+        p1.velocity = Vector3::new(1.0, 1.0, 0.0);
+        p2.velocity = Vector3::new(-1.0, 1.0, 0.0);
+        p1.mass = 66.335;
+        p2.mass = 66.335;
+        let mut state = State {
+            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
+        };
+        update_force(&mut state);
+        let mv = get_center_of_mass_velocity(&state, 0, 2);
+        let e_thermal = get_thermal_energy(&state, 0, 2, &mv);
+        let temperature = get_temperature(e_thermal, 2);
+        assert_eq!(
+            format!("{:.8}", temperature),
+            "1601.54204479"
+        );
+    }
+
+    #[test]
+    fn pressure() {
+        let mut p1 = Particle::default();
+        let mut p2 = Particle::default();
+        p1.position = Vector3::new(0.75, 0.75, 0.5);
+        p2.position = Vector3::new(1.25, 0.75, 0.5);
+        p1.velocity = Vector3::new(1.0, 1.0, 0.0);
+        p2.velocity = Vector3::new(-1.0, 1.0, 0.0);
+        p1.mass = 66.335;
+        p2.mass = 66.335;
+        let mut state = State {
+            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
+        };
+        update_force(&mut state);
+        let mv = get_center_of_mass_velocity(&state, 0, 2);
+        let pressure = get_pressure(&state, 0, 2, &mv);
+        assert_eq!(
+            format!("{:.8}", pressure),
+            "5.66696787"
         );
     }
 }

@@ -11,6 +11,8 @@ pub use particle::Particle;
 pub use particle::State;
 pub use particles_database::ParticleDatabase;
 pub use save_data::*;
+#[macro_use]
+extern crate log;
 
 pub const K_B: f64 = 1.380648528;
 

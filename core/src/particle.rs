@@ -14,6 +14,8 @@ pub struct Particle {
     pub force: Vector3<f64>,
     /// The total potential of the particle
     pub potential: f64,
+    /// Sum of F(i,j) * r(i, j) for every other particle
+    pub temp: f64,
     /// Mass of particle
     pub mass: f64,
     /// Radius of particle
@@ -39,6 +41,7 @@ impl Particle {
             velocity,
             force: Vector3::new(0.0, 0.0, 0.0),
             potential: 0.0,
+            temp: 0.0,
             id: particle_id,
             mass,
             radius,
@@ -53,6 +56,7 @@ impl Default for Particle {
             velocity: Vector3::new(0.0, 0.0, 0.0),
             force: Vector3::new(0.0, 0.0, 0.0),
             potential: 0.0,
+            temp: 0.0,
             id: 0,
             mass: 1.0,
             radius: 0.1,

@@ -59,6 +59,7 @@ impl ParticleToSave {
                 velocity: self.velocity,
                 force: Default::default(),
                 potential: 0.0,
+                temp: 0.0,
                 mass,
                 radius,
                 id,

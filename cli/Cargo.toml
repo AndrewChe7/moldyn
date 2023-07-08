@@ -11,3 +11,5 @@ moldyn_core = { path = "../core" }
 moldyn_solver = { path = "../solver" }
 nalgebra = "0.32.2"
 indicatif = "0.17.5"
+log = "0.4.19"
+env_logger = "0.10.0"

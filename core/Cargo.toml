@@ -11,6 +11,7 @@ serde = {version="1.0.164", features = ["derive"]}
 nalgebra = {version="0.32.2", features = ["serde-serialize"]}
 lazy_static = "1.4.0"
 rayon = "1.7.0"
+log = "0.4.19"
 
 [dev-dependencies]
 tempdir = "0.3.7"
