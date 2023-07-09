@@ -327,7 +327,7 @@ mod tests {
         let pressure = get_pressure(&state, 0, 2, &mv);
         assert_eq!(
             format!("{:.8}", pressure),
-            "5.66696787"
+            "5.38886546"
         );
     }
 }

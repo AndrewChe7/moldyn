@@ -15,7 +15,7 @@ pub fn get_pressure(state: &State,
         res += particle.mass * dv.x * dv.x;
         res += particle.mass * dv.y * dv.y;
         res += particle.mass * dv.z * dv.z;
-        res += particle.temp;
+        res -= particle.temp;
         res
     }).sum();
     result / volume / 3.0
