@@ -5,8 +5,6 @@ extern crate rayon;
 pub mod initializer;
 pub mod macro_parameters;
 pub mod solver;
-#[macro_use]
-extern crate log;
 
 #[cfg(test)]
 mod tests {
@@ -169,6 +167,74 @@ mod tests {
             assert_eq!(format!("{:.8}", v1.z), "0.00000000");
 
             assert_eq!(format!("{:.8}", v2.x), "-1.00020571");
+            assert_eq!(format!("{:.8}", v2.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v2.z), "0.00000000");
+        }
+        verlet.calculate(&mut state, 0.002);
+        {
+            let p1 = state.particles[0].lock().expect("Can't lock particle");
+            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let pos1 = p1.position;
+            let pos2 = p2.position;
+            let v1 = p1.velocity;
+            let v2 = p2.velocity;
+            let f1 = p1.force;
+            let f2 = p2.force;
+            assert_eq!(format!("{:.8}", pos1.x), "0.75400082");
+            assert_eq!(format!("{:.8}", pos1.y), "0.75400000");
+            assert_eq!(format!("{:.8}", pos1.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", pos2.x), "1.24599918");
+            assert_eq!(format!("{:.8}", pos2.y), "0.75400000");
+            assert_eq!(format!("{:.8}", pos2.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", f1.x), "7.27764996");
+            assert_eq!(format!("{:.8}", f1.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", f2.x), "-7.27764996");
+            assert_eq!(format!("{:.8}", f2.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f2.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v1.x), "1.00042051");
+            assert_eq!(format!("{:.8}", v1.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v2.x), "-1.00042051");
+            assert_eq!(format!("{:.8}", v2.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v2.z), "0.00000000");
+        }
+        verlet.calculate(&mut state, 0.002);
+        {
+            let p1 = state.particles[0].lock().expect("Can't lock particle");
+            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let pos1 = p1.position;
+            let pos2 = p2.position;
+            let v1 = p1.velocity;
+            let v2 = p2.velocity;
+            let f1 = p1.force;
+            let f2 = p2.force;
+            assert_eq!(format!("{:.8}", pos1.x), "0.75600188");
+            assert_eq!(format!("{:.8}", pos1.y), "0.75600000");
+            assert_eq!(format!("{:.8}", pos1.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", pos2.x), "1.24399812");
+            assert_eq!(format!("{:.8}", pos2.y), "0.75600000");
+            assert_eq!(format!("{:.8}", pos2.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", f1.x), "7.59359964");
+            assert_eq!(format!("{:.8}", f1.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", f2.x), "-7.59359964");
+            assert_eq!(format!("{:.8}", f2.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f2.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v1.x), "1.00064469");
+            assert_eq!(format!("{:.8}", v1.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v2.x), "-1.00064469");
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }

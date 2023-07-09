@@ -1,11 +1,12 @@
 use clap::Parser;
 use crate::args::*;
-use crate::commands::{initialize, solve};
+use crate::commands::{initialize, solve, solve_macro};
 
-#[macro_use]
-extern crate log;
 mod args;
 mod commands;
+
+#[cfg(test)]
+mod tests;
 
 fn main() {
     env_logger::init();
@@ -33,6 +34,21 @@ fn main() {
         } => {
             solve(&args.file, out_file, integrate_method,
                   custom_method, potentials_file, iteration_count, delta_time);
+        }
+        Commands::SolveMacroParameters {
+            out_file,
+            kinetic_energy,
+            potential_energy,
+            thermal_energy,
+            temperature,
+            pressure,
+            custom,
+            custom_name,
+            range
+        } => {
+            solve_macro(&args.file, out_file, *kinetic_energy, *potential_energy,
+                        *thermal_energy, *temperature, *pressure,
+                        *custom, custom_name, range);
         }
     }
 }

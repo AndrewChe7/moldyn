@@ -1,5 +1,8 @@
 use cgmath::{Euler, Quaternion, Rad};
-use winit::event::{DeviceEvent, ElementState, KeyboardInput, MouseScrollDelta, VirtualKeyCode, WindowEvent};
+use winit::event::{DeviceEvent, ElementState, KeyboardInput, MouseScrollDelta, VirtualKeyCode};
+#[cfg(target_arch = "wasm32")]
+use winit::event::WindowEvent;
+
 use crate::visualizer::camera::Camera;
 
 pub struct CameraController {
@@ -121,6 +124,7 @@ impl CameraController {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
     pub fn process_window_events (&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {

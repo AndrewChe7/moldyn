@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "moldyn_gui"
+name = "moldyn_gui_app"
 path = "src/main.rs"
 
 [lib]
+name = "moldyn_gui"
 crate-type = ["cdylib", "rlib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -73,4 +73,29 @@ pub enum Commands {
         #[arg(short = 't', long)]
         delta_time: f64,
     },
+    /// calculate macro parameters for solved state
+    SolveMacroParameters {
+        /// file for output
+        #[arg(short = 'o', long)]
+        out_file: PathBuf,
+        #[arg(short = 'k', long)]
+        kinetic_energy: bool,
+        #[arg(short = 'p', long)]
+        potential_energy: bool,
+        #[arg(short = 't', long)]
+        thermal_energy: bool,
+        #[arg(short = 'T', long)]
+        temperature: bool,
+        #[arg(short = 'P', long)]
+        pressure: bool,
+        /// if you use custom macro parameter, set it true
+        #[arg(short = 'c', long)]
+        custom: bool,
+        /// if you set custom to true, set the name of it
+        #[arg(short = 'C', long)]
+        custom_name: Option<String>,
+        /// Which frames should be processed
+        #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ' ')]
+        range: Option<Vec<usize>>,
+    },
 }

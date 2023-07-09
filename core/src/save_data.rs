@@ -24,12 +24,33 @@ pub struct StateToSave {
     pub boundary_box: Vector3<f64>,
 }
 
+pub enum MacroParameterType {
+    KineticEnergy(f64),
+    PotentialEnergy(f64),
+    ThermalEnergy(f64),
+    Temperature(f64),
+    Pressure(f64),
+    Custom(usize, f64),
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MacroParameters {
+    pub kinetic_energy: f64,
+    pub potential_energy: f64,
+    pub thermal_energy: f64,
+    pub temperature: f64,
+    pub pressure: f64,
+    pub custom: HashMap<usize, f64>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DataFile {
     #[serde(serialize_with = "ordered_map")]
     pub frames: HashMap<usize, StateToSave>,
     #[serde(serialize_with = "ordered_map")]
     pub particles_database: HashMap<u16, ParticleData>,
+    #[serde(serialize_with = "ordered_map")]
+    pub macro_parameters: HashMap<usize, MacroParameters>,
     pub start_frame: usize,
     pub frame_count: usize,
 }
@@ -127,6 +148,7 @@ impl DataFile {
         DataFile {
             frames,
             particles_database,
+            macro_parameters: HashMap::new(),
             start_frame: 0,
             frame_count: 1,
         }
@@ -137,6 +159,42 @@ impl DataFile {
         let last_frame = self.start_frame + self.frame_count;
         self.frames.insert(last_frame, state);
         self.frame_count += 1;
+    }
+
+    pub fn add_macro_params(&mut self, frame: usize, parameters: &[MacroParameterType]) {
+        if !self.frames.contains_key(&frame) {
+            return;
+        }
+        let mut macro_parameters = self.macro_parameters.entry(frame).or_insert(MacroParameters {
+            kinetic_energy: 0.0,
+            potential_energy: 0.0,
+            thermal_energy: 0.0,
+            temperature: 0.0,
+            pressure: 0.0,
+            custom: HashMap::new(),
+        });
+        for parameter in parameters {
+            match parameter {
+                MacroParameterType::KineticEnergy(value) => {
+                    macro_parameters.kinetic_energy = value.clone();
+                }
+                MacroParameterType::PotentialEnergy(value) => {
+                    macro_parameters.potential_energy = value.clone();
+                }
+                MacroParameterType::ThermalEnergy(value) => {
+                    macro_parameters.thermal_energy = value.clone();
+                }
+                MacroParameterType::Pressure(value) => {
+                    macro_parameters.pressure = value.clone();
+                }
+                MacroParameterType::Temperature(value) => {
+                    macro_parameters.temperature = value.clone();
+                }
+                MacroParameterType::Custom(_id, _value) => {
+                    todo!()
+                }
+            }
+        }
     }
 
     pub fn merge_data_files(a: &DataFile, b: &DataFile) -> Result<DataFile, ()> {
@@ -151,9 +209,12 @@ impl DataFile {
         particles_database.extend(b.particles_database.clone());
         let mut frames = a.frames.clone();
         frames.extend(b.frames.clone());
+        let mut macro_parameters = a.macro_parameters.clone();
+        macro_parameters.extend(b.macro_parameters.clone());
         let result = DataFile {
             frames,
             particles_database,
+            macro_parameters,
             start_frame: a.start_frame,
             frame_count: a.frame_count + b.frame_count,
         };
@@ -166,6 +227,8 @@ impl DataFile {
         }
         let mut a = HashMap::new();
         let mut b = HashMap::new();
+        let mut a_macro = HashMap::new();
+        let mut b_macro = HashMap::new();
         for (i, frame) in &data.frames {
             let t = *i - data.start_frame;
             if t < frame_count_for_first_part {
@@ -174,20 +237,29 @@ impl DataFile {
                 b.insert(i.clone(), frame.clone());
             }
         }
+        for (i, macro_param) in &data.macro_parameters {
+            let t = *i - data.start_frame;
+            if t < frame_count_for_first_part {
+                a_macro.insert(i.clone(), macro_param.clone());
+            } else {
+                b_macro.insert(i.clone(), macro_param.clone());
+            }
+        }
         let left = DataFile {
             frames: a,
             particles_database: data.particles_database.clone(),
+            macro_parameters: a_macro,
             start_frame: data.start_frame,
             frame_count: frame_count_for_first_part,
         };
         let right = DataFile {
             frames: b,
             particles_database: data.particles_database.clone(),
+            macro_parameters: b_macro,
             start_frame: data.start_frame + frame_count_for_first_part,
             frame_count: data.frame_count - frame_count_for_first_part,
         };
-        let result = (left, right);
-        Ok(result)
+        Ok((left, right))
     }
 
     pub fn save_to_file (&self, path: &Path) {
