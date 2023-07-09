@@ -24,13 +24,15 @@ impl CameraController {
         }
     }
 
-    pub fn process_events(&mut self, event: &DeviceEvent) -> bool {
+    pub fn process_events(&mut self, event: &DeviceEvent, is_over_imgui: bool) -> bool {
         match event {
             DeviceEvent::MouseMotion {
                 delta: (x, y),
                 ..
             } => {
-                self.delta_mouse = (*x as f32, *y as f32);
+                if !is_over_imgui {
+                    self.delta_mouse = (*x as f32, *y as f32);
+                }
                 true
             },
             DeviceEvent::MouseWheel {

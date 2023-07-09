@@ -3,6 +3,9 @@ use std::ops::Deref;
 use bytemuck::Pod;
 use bytemuck::Zeroable;
 use cgmath::Matrix4;
+use egui::FontDefinitions;
+use egui_wgpu_backend::ScreenDescriptor;
+use egui_winit_platform::{Platform, PlatformDescriptor};
 use nalgebra::Vector3;
 use wgpu::RenderPipelineDescriptor;
 use wgpu::util::DeviceExt;
@@ -16,6 +19,7 @@ use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+use crate::visualizer::imgui::main_window_ui;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32= 1080;
@@ -90,6 +94,9 @@ struct State {
     depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
     depth_texture_sampler: wgpu::Sampler,
+    platform: Platform,
+    egui_rpass: egui_wgpu_backend::RenderPass,
+    _egui_demo: egui_demo_lib::DemoWindows,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -105,6 +112,7 @@ pub async fn visualizer_window() {
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
+        .with_title("MolDyn")
         .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
         .build(&event_loop).unwrap();
 
@@ -136,12 +144,14 @@ pub async fn visualizer_window() {
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 66.335);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
+        state.imgui_event(&event);
+        let ctx = &state.platform.context();
         match event {
             Event::DeviceEvent {
                 ref event,
                 ..
             } => {
-                state.camera_controller.process_events(&event);
+                state.camera_controller.process_events(&event, ctx.is_using_pointer());
             }
             Event::WindowEvent {
                 ref event,
@@ -521,6 +531,15 @@ impl State {
         );
         let (depth_texture, depth_texture_view, depth_texture_sampler) =
             Self::create_depth_texture(&device, &config, "depth texture");
+        let platform = Platform::new(PlatformDescriptor {
+            physical_width: size.width,
+            physical_height: size.height,
+            scale_factor: window.scale_factor(),
+            font_definitions: FontDefinitions::default(),
+            style: Default::default(),
+        });
+        let egui_rpass = egui_wgpu_backend::RenderPass::new(&device, surface_format, 1);
+        let egui_demo = egui_demo_lib::DemoWindows::default();
         Self {
             window,
             surface,
@@ -548,7 +567,14 @@ impl State {
             depth_texture,
             depth_texture_view,
             depth_texture_sampler,
+            platform,
+            egui_rpass,
+            _egui_demo: egui_demo,
         }
+    }
+
+    fn imgui_event(&mut self, event: &Event<()>) {
+        self.platform.handle_event(&event);
     }
 
     fn update_particle_state (&mut self, state: &moldyn_core::State) {
@@ -727,6 +753,40 @@ impl State {
             render_pass.set_vertex_buffer(0, self.bounding_box_buffer.slice(..));
             render_pass.set_index_buffer(self.bounding_box_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..BOX_INDICES.len() as u32, 0, 0..1);
+        }
+        {
+            self.platform.begin_frame();
+            let ctx = &self.platform.context();
+            /////
+            main_window_ui(ctx);
+            ////
+            // End the UI frame. We could now handle the output and draw the UI with the backend.
+            let full_output = self.platform.end_frame(Some(&self.window));
+            let paint_jobs = self.platform.context().tessellate(full_output.shapes);
+
+            // Upload all resources for the GPU.
+            let screen_descriptor = ScreenDescriptor {
+                physical_width: self.config.width,
+                physical_height: self.config.height,
+                scale_factor: self.window.scale_factor() as f32,
+            };
+            let tdelta: egui::TexturesDelta = full_output.textures_delta;
+            self.egui_rpass
+                .add_textures(&self.device, &self.queue, &tdelta)
+                .expect("Something went wrong");
+            self.egui_rpass.update_buffers(&self.device, &self.queue, &paint_jobs, &screen_descriptor);
+
+            // Record all render passes.
+            self.egui_rpass
+                .execute(
+                    &mut encoder,
+                    &view,
+                    &paint_jobs,
+                    &screen_descriptor,
+                    None,
+                )
+                .unwrap();
+
         }
         // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
