@@ -14,6 +14,8 @@ use moldyn_core::{Particle, ParticleDatabase};
 use moldyn_solver::solver::Integrator;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32= 1080;
@@ -111,7 +113,7 @@ pub async fn visualizer_window() {
         // Winit prevents sizing with CSS, so we have to set
         // the size manually when on web.
         use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(450, 400));
+        window.set_inner_size(PhysicalSize::new(WIDTH, HEIGHT));
 
         use winit::platform::web::WindowExtWebSys;
         web_sys::window()
@@ -144,7 +146,9 @@ pub async fn visualizer_window() {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == state.window().id() => if !state.input(event) { // UPDATED!
+            } if window_id == state.window().id() => if !state.input(event) {
+                #[cfg(target_arch = "wasm32")]
+                state.camera_controller.process_window_events(event);
                 match event {
                     WindowEvent::CloseRequested
                     | WindowEvent::KeyboardInput {
