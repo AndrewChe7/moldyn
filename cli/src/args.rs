@@ -94,8 +94,8 @@ pub enum Commands {
         /// if you set custom to true, set the name of it
         #[arg(short = 'C', long)]
         custom_name: Option<String>,
-        /// Which frames should be processed
-        #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ' ')]
+        /// Which frames should be processed ([start]:[end]:[step])
+        #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ':')]
         range: Option<Vec<usize>>,
     },
 }

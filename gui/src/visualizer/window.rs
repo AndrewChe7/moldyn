@@ -149,11 +149,11 @@ pub async fn visualizer_window() {
     }
 
     let mut state = State::new(window).await;
-    let mut particles_state = moldyn_solver::initializer::initialize_particles(125, &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
+    let mut particles_state = moldyn_solver::initializer::initialize_particles(1000, &(Vector3::new(10.0, 10.0, 10.0) * 3.338339));
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
     let verlet_method = Integrator::VerletMethod;
     moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, 0, (0.0, 0.0, 0.0),
-                                                              (5, 5, 5), 3.338339).expect("Can't init positions");
+                                                              (10, 10, 10), 3.338339).expect("Can't init positions");
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 66.335);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
@@ -272,7 +272,7 @@ impl CameraUniform {
     pub fn from(camera: &Camera) -> CameraUniform {
         let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
         let aspect = camera.width as f32 / camera.height as f32;
-        let proj = cgmath::perspective(cgmath::Deg(110.0), aspect, 0.01, 100.0);
+        let proj = cgmath::perspective(cgmath::Deg(camera.fovy), aspect, 0.01, 10000.0);
         let view_proj = proj * view;
         CameraUniform {
             view_pos: [camera.eye.x, camera.eye.y, camera.eye.z, 1.0],
@@ -777,7 +777,7 @@ impl State {
                 let camera = &self.camera;
                 let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
                 let aspect = camera.width as f32 / camera.height as f32;
-                let proj = cgmath::perspective(cgmath::Deg(110.0), aspect, 0.01, 100.0);
+                let proj = cgmath::perspective(cgmath::Deg(camera.fovy), aspect, 0.01, 10000.0);
                 let model = [
                     [1.0, 0.0, 0.0, 0.0,],
                     [0.0, 1.0, 0.0, 0.0,],

@@ -53,6 +53,35 @@ mod tests {
         assert_eq!(particle.position.z, 0.0);
     }
 
+    fn check_impulse(state: &State) {
+        let mut p = Vector3::new(0.0, 0.0, 0.0);
+        for particle in &state.particles {
+            let particle = particle.lock().expect("Can't lock particle");
+            p += particle.velocity * particle.mass;
+        }
+        assert_eq!(format!("{:.11}", p.x.abs()), "0.00000000000");
+        assert_eq!(format!("{:.11}", p.y.abs()), "0.00000000000");
+        assert_eq!(format!("{:.11}", p.z.abs()), "0.00000000000");
+    }
+
+    #[test]
+    fn impulse () {
+        let bounding_box = Vector3::new(10.0, 10.0, 10.0) * 3.338339;
+        let verlet_method = Integrator::VerletMethod;
+        let mut state = initializer::initialize_particles(1000, &bounding_box);
+        ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+        initializer::initialize_particles_position(&mut state, 0, 0,
+                                                   (0.0, 0.0, 0.0), (10, 10, 10), 3.338339)
+            .expect("Can't initialize particles");
+        initializer::initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        update_force(&mut state);
+        check_impulse(&state);
+        for _ in 0..5 {
+            verlet_method.calculate(&mut state, 0.002);
+            check_impulse(&state);
+        }
+    }
+
     #[test]
     fn lennard_jones() {
         let lennard_jones_potential = Potential::new_lennard_jones(0.3418, 1.712);
