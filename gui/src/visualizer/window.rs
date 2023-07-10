@@ -120,12 +120,24 @@ pub async fn visualizer_window() {
     {
         // Winit prevents sizing with CSS, so we have to set
         // the size manually when on web.
-        use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(WIDTH, HEIGHT));
-
         use winit::platform::web::WindowExtWebSys;
-        web_sys::window()
-            .and_then(|win| win.document())
+        use winit::dpi::{PhysicalSize, LogicalSize};
+        let mut width = WIDTH;
+        let mut height = HEIGHT;
+        web_sys::window().and_then(|win| {
+            width = win.inner_width()
+                .unwrap().as_f64().unwrap() as u32;
+            height = win.inner_height()
+                .unwrap().as_f64().unwrap() as u32;
+            let factor = window.scale_factor();
+            let logical = LogicalSize { width, height };
+            let PhysicalSize { width, height }: PhysicalSize<u32> = logical.to_physical(factor);
+            let width = width.min(2048);
+            window.set_inner_size(PhysicalSize::new(width, height));
+            Some(())
+        });
+
+        web_sys::window().and_then(|win| { win.document() })
             .and_then(|doc| {
                 let dst = doc.get_element_by_id("visualizer")?;
                 let canvas = web_sys::Element::from(window.canvas());
