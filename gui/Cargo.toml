@@ -25,6 +25,7 @@ egui = "0.22.0"
 egui_demo_lib = "0.22.0"
 egui_wgpu_backend = "0.24.0"
 egui_winit_platform = "0.19.0"
+egui-gizmo = { version = "0.11.0", git = "https://github.com/urholaukkarinen/egui-gizmo" }
 env_logger = "0.10.0"
 log = "0.4.19"
 pollster = "0.3.0"

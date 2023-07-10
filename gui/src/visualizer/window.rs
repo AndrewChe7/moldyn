@@ -4,6 +4,7 @@ use bytemuck::Pod;
 use bytemuck::Zeroable;
 use cgmath::Matrix4;
 use egui::FontDefinitions;
+use egui_gizmo::GizmoMode;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use nalgebra::Vector3;
@@ -771,6 +772,25 @@ impl State {
             let ctx = &self.platform.context();
             /////
             main_window_ui(ctx);
+            use egui_gizmo::Gizmo;
+            egui::Area::new("Gizmo Area").show(ctx, |ui| {
+                let camera = &self.camera;
+                let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
+                let aspect = camera.width as f32 / camera.height as f32;
+                let proj = cgmath::perspective(cgmath::Deg(110.0), aspect, 0.01, 100.0);
+                let model = [
+                    [1.0, 0.0, 0.0, 0.0,],
+                    [0.0, 1.0, 0.0, 0.0,],
+                    [0.0, 0.0, 1.0, 0.0,],
+                    [0.0, 0.0, 0.0, 1.0,],
+                ];
+                let gizmo = Gizmo::new("My gizmo")
+                    .view_matrix(view)
+                    .projection_matrix(proj)
+                    .model_matrix(model)
+                    .mode(GizmoMode::Translate);
+                gizmo.interact(ui);
+            });
             ////
             // End the UI frame. We could now handle the output and draw the UI with the backend.
             let full_output = self.platform.end_frame(Some(&self.window));
