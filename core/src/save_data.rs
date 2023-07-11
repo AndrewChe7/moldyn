@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Mutex;
@@ -267,7 +267,7 @@ impl DataFile {
         let file = if !path.exists() {
             File::create(path)
         } else {
-            File::open(path)
+            OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
         let mut buf_writer = BufWriter::new(file);
         serde_json::ser::to_writer_pretty(&mut buf_writer, &self)

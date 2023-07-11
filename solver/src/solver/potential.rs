@@ -3,7 +3,7 @@ use moldyn_core::State;
 use rayon::prelude::*;
 use std::sync::Mutex;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 use rand_distr::num_traits::Pow;
@@ -130,7 +130,7 @@ pub fn save_potentials_to_file (path: &PathBuf) {
     let db = POTENTIALS_DATA.lock()
         .expect("Can't lock potentials database");
     let file = if path.exists() {
-        File::open(path).expect("Can't open file")
+        OpenOptions::new().truncate(true).write(true).open(path).expect("Can't open file")
     } else {
         File::create(path).expect("Can't create file")
     };

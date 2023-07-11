@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::option::Option;
 use std::path::Path;
@@ -83,7 +83,7 @@ impl ParticleDatabase {
         let file = if !path.exists() {
             File::create(path)
         } else {
-            File::open(path)
+            OpenOptions::new().truncate(true).write(true).open(path)
         };
         if file.is_err() {
             return Err(SaveLoadError::CantOpen);

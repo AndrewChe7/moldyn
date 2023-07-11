@@ -7,7 +7,13 @@ use crate::args::{CrystalCellType, IntegratorChoose};
 
 
 const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
-const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7}";
+const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7} {eta_precise:9} |";
+
+pub fn backup(data: &DataFile, out_file: &PathBuf, iteration: usize) {
+    let mut backup_file = out_file.clone();
+    backup_file.set_extension(format!("backup.{}.json", iteration));
+    data.save_to_file(&backup_file);
+}
 
 pub fn initialize_uniform(file: &PathBuf,
                           size: &Vec<u32>,
@@ -82,7 +88,10 @@ pub fn solve(in_file: &PathBuf,
             .progress_chars(PROGRESS_BAR_SYMBOLS)
     );
     pb.set_prefix("Solving steps: ");
-    for _ in 0..*iteration_count {
+    for i in 0..*iteration_count {
+        if i > 0 && i % 1000 == 0 {
+            backup(&data, out_file, i);
+        }
         integrator.calculate(&mut state, *delta_time);
         data.add_state(&state);
         pb.inc(1);
@@ -132,6 +141,10 @@ pub fn solve_macro(in_file: &PathBuf,
     );
     pb.set_prefix("Solving macro steps: ");
     for i in (start..end).step_by(step) {
+        let num_it = (i - start) / step;
+        if num_it > 0 && num_it % 1000 == 0 {
+            backup(&data, out_file, i);
+        }
         let state = data.frames.get(&i)
             .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());
         let mut state: moldyn_core::State = state.into();
