@@ -8,6 +8,12 @@ pub struct Args {
     /// path to file with particles data
     #[arg(short = 'f', long)]
     pub file: PathBuf,
+    /// outputs in human-readable format
+    #[arg(long, default_value_t=false)]
+    pub pretty_print: bool,
+    /// how often to make backup
+    #[arg(short, long, default_value_t=2000)]
+    pub backup: usize,
     #[command(subcommand)]
     pub command: Commands,
 }

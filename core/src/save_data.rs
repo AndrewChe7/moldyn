@@ -39,6 +39,9 @@ pub struct MacroParameters {
     pub kinetic_energy: f64,
     pub potential_energy: f64,
     pub thermal_energy: f64,
+    pub unit_kinetic_energy: f64,
+    pub unit_potential_energy: f64,
+    pub unit_thermal_energy: f64,
     pub temperature: f64,
     pub pressure: f64,
     pub custom: HashMap<usize, f64>,
@@ -162,7 +165,7 @@ impl DataFile {
         self.frame_count += 1;
     }
 
-    pub fn add_macro_params(&mut self, frame: usize, parameters: &[MacroParameterType]) {
+    pub fn add_macro_params(&mut self, frame: usize, parameters: &[MacroParameterType], particles_count: usize) {
         if !self.frames.contains_key(&frame) {
             return;
         }
@@ -170,6 +173,9 @@ impl DataFile {
             kinetic_energy: 0.0,
             potential_energy: 0.0,
             thermal_energy: 0.0,
+            unit_kinetic_energy: 0.0,
+            unit_potential_energy: 0.0,
+            unit_thermal_energy: 0.0,
             temperature: 0.0,
             pressure: 0.0,
             custom: HashMap::new(),
@@ -178,12 +184,15 @@ impl DataFile {
             match parameter {
                 MacroParameterType::KineticEnergy(value) => {
                     macro_parameters.kinetic_energy = value.clone();
+                    macro_parameters.unit_kinetic_energy = value.clone() / particles_count as f64;
                 }
                 MacroParameterType::PotentialEnergy(value) => {
                     macro_parameters.potential_energy = value.clone();
+                    macro_parameters.unit_potential_energy = value.clone() / particles_count as f64;
                 }
                 MacroParameterType::ThermalEnergy(value) => {
                     macro_parameters.thermal_energy = value.clone();
+                    macro_parameters.unit_thermal_energy = value.clone() / particles_count as f64;
                 }
                 MacroParameterType::Pressure(value) => {
                     macro_parameters.pressure = value.clone();
@@ -263,15 +272,20 @@ impl DataFile {
         Ok((left, right))
     }
 
-    pub fn save_to_file (&self, path: &Path) {
+    pub fn save_to_file (&self, path: &Path, pretty_print: bool) {
         let file = if !path.exists() {
             File::create(path)
         } else {
             OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
         let mut buf_writer = BufWriter::new(file);
-        serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
-            .expect("Can't save data to file");
+        if pretty_print {
+            serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
+                .expect("Can't save data to file");
+        } else {
+            serde_json::ser::to_writer(&mut buf_writer, &self)
+                .expect("Can't save data to file");
+        }
     }
 
     pub fn load_from_file (path: &Path) -> Self {

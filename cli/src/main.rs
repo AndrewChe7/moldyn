@@ -22,7 +22,8 @@ fn main() {
             temperature
         } => {
             initialize(&args.file, crystal_cell_type, size, particle_name,
-                       particle_mass, particle_radius, lattice_cell, temperature);
+                       particle_mass, particle_radius, lattice_cell, temperature,
+                       args.pretty_print);
         }
         Commands::Solve {
             out_file,
@@ -33,7 +34,8 @@ fn main() {
             delta_time,
         } => {
             solve(&args.file, out_file, integrate_method,
-                  custom_method, potentials_file, iteration_count, delta_time);
+                  custom_method, potentials_file, *iteration_count,
+                  delta_time, args.pretty_print, args.backup);
         }
         Commands::SolveMacroParameters {
             out_file,
@@ -48,7 +50,8 @@ fn main() {
         } => {
             solve_macro(&args.file, out_file, *kinetic_energy, *potential_energy,
                         *thermal_energy, *temperature, *pressure,
-                        *custom, custom_name, range);
+                        *custom, custom_name, range,
+                        args.pretty_print, args.backup);
         }
     }
 }

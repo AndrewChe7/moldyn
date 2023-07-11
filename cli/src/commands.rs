@@ -12,7 +12,7 @@ const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{l
 pub fn backup(data: &DataFile, out_file: &PathBuf, iteration: usize) {
     let mut backup_file = out_file.clone();
     backup_file.set_extension(format!("backup.{}.json", iteration));
-    data.save_to_file(&backup_file);
+    data.save_to_file(&backup_file, false);
 }
 
 pub fn initialize_uniform(file: &PathBuf,
@@ -21,7 +21,8 @@ pub fn initialize_uniform(file: &PathBuf,
                           particle_mass: &f64,
                           particle_radius: &f64,
                           lattice_cell: &f64,
-                          temperature: &f64) {
+                          temperature: &f64,
+                          pretty_print: bool) {
     ParticleDatabase::add(0, particle_name.as_str(), particle_mass.clone(), particle_radius.clone());
     let particles_count = (size[0] * size[1] * size[2]) as usize;
     let boundary_box = Vector3::new(
@@ -39,7 +40,7 @@ pub fn initialize_uniform(file: &PathBuf,
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut state,
                                                               temperature.clone(), particle_mass.clone());
     let data = DataFile::init_from_state(&state);
-    data.save_to_file(file);
+    data.save_to_file(file, pretty_print);
 }
 
 pub fn initialize(file: &PathBuf,
@@ -49,12 +50,13 @@ pub fn initialize(file: &PathBuf,
                   particle_mass: &f64,
                   particle_radius: &f64,
                   lattice_cell: &f64,
-                  temperature: &f64) {
+                  temperature: &f64,
+                  pretty_print: bool) {
     match crystal_cell_type {
         CrystalCellType::Uniform => {
             initialize_uniform(file, size,
                                particle_name, particle_mass, particle_radius,
-                               lattice_cell, temperature);
+                               lattice_cell, temperature, pretty_print);
         }
     }
 }
@@ -64,8 +66,10 @@ pub fn solve(in_file: &PathBuf,
              integrator: &IntegratorChoose,
              _custom_method: &Option<String>,
              potentials_file: &Option<PathBuf>,
-             iteration_count: &usize,
-             delta_time: &f64) {
+             iteration_count: usize,
+             delta_time: &f64,
+             pretty_print: bool,
+             backup_frequency: usize) {
     let mut data = DataFile::load_from_file(in_file);
     ParticleDatabase::load(&data.particles_database);
     let mut state = data.get_last_frame();
@@ -81,15 +85,15 @@ pub fn solve(in_file: &PathBuf,
     if let Some(potentials_file) = potentials_file {
         moldyn_solver::solver::load_potentials_from_file(potentials_file);
     }
-    let pb = ProgressBar::new(*iteration_count as u64);
+    let pb = ProgressBar::new(iteration_count as u64);
     pb.set_style(
         ProgressStyle::with_template(&PROGRESS_BAR_STYLE)
             .expect("Can't set style for progress bar")
             .progress_chars(PROGRESS_BAR_SYMBOLS)
     );
     pb.set_prefix("Solving steps: ");
-    for i in 0..*iteration_count {
-        if i > 0 && i % 1000 == 0 {
+    for i in 0..iteration_count {
+        if i > 0 && i % backup_frequency == 0 {
             backup(&data, out_file, i);
         }
         integrator.calculate(&mut state, *delta_time);
@@ -97,7 +101,7 @@ pub fn solve(in_file: &PathBuf,
         pb.inc(1);
     }
     pb.finish_with_message(format!("Calculated. States saved to {}", out_file.to_string_lossy()));
-    data.save_to_file(out_file);
+    data.save_to_file(out_file, pretty_print);
 }
 
 pub fn solve_macro(in_file: &PathBuf,
@@ -109,7 +113,9 @@ pub fn solve_macro(in_file: &PathBuf,
                    pressure: bool,
                    custom: bool,
                    _custom_name: &Option<String>,
-                   range: &Option<Vec<usize>>) {
+                   range: &Option<Vec<usize>>,
+                   pretty_print: bool,
+                   backup_frequency: usize) {
     let mut data = DataFile::load_from_file(in_file);
     ParticleDatabase::load(&data.particles_database);
     let mut start = 0usize;
@@ -142,7 +148,7 @@ pub fn solve_macro(in_file: &PathBuf,
     pb.set_prefix("Solving macro steps: ");
     for i in (start..end).step_by(step) {
         let num_it = (i - start) / step;
-        if num_it > 0 && num_it % 1000 == 0 {
+        if num_it > 0 && num_it % backup_frequency == 0 {
             backup(&data, out_file, i);
         }
         let state = data.frames.get(&i)
@@ -184,9 +190,9 @@ pub fn solve_macro(in_file: &PathBuf,
         if custom {
             todo!()
         }
-        data.add_macro_params(i, &parameters);
+        data.add_macro_params(i, &parameters, particle_count);
         pb.inc(step as u64);
     }
     pb.finish_with_message(format!("Calculated. Macro Parameters saved to {}", out_file.to_string_lossy()));
-    data.save_to_file(out_file);
+    data.save_to_file(out_file, pretty_print);
 }

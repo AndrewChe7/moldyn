@@ -57,11 +57,11 @@ mod tests {
         let mut p = Vector3::new(0.0, 0.0, 0.0);
         for particle in &state.particles {
             let particle = particle.lock().expect("Can't lock particle");
-            p += particle.velocity * particle.mass;
+            p += particle.velocity;
         }
-        assert_eq!(format!("{:.11}", p.x.abs()), "0.00000000000");
-        assert_eq!(format!("{:.11}", p.y.abs()), "0.00000000000");
-        assert_eq!(format!("{:.11}", p.z.abs()), "0.00000000000");
+        assert!(p.x.abs() < 1e-14);
+        assert!(p.y.abs() < 1e-14);
+        assert!(p.z.abs() < 1e-14);
     }
 
     #[test]
