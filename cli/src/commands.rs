@@ -1,9 +1,13 @@
 use std::path::PathBuf;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use moldyn_core::{DataFile, MacroParameterType, ParticleDatabase};
 use moldyn_solver::solver::{Integrator, update_force};
 use crate::args::{CrystalCellType, IntegratorChoose};
+
+
+const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
+const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7}";
 
 pub fn initialize_uniform(file: &PathBuf,
                           size: &Vec<u32>,
@@ -72,6 +76,12 @@ pub fn solve(in_file: &PathBuf,
         moldyn_solver::solver::load_potentials_from_file(potentials_file);
     }
     let pb = ProgressBar::new(*iteration_count as u64);
+    pb.set_style(
+        ProgressStyle::with_template(&PROGRESS_BAR_STYLE)
+            .expect("Can't set style for progress bar")
+            .progress_chars(PROGRESS_BAR_SYMBOLS)
+    );
+    pb.set_prefix("Solving steps: ");
     for _ in 0..*iteration_count {
         integrator.calculate(&mut state, *delta_time);
         data.add_state(&state);
@@ -115,6 +125,12 @@ pub fn solve_macro(in_file: &PathBuf,
         panic!("Last frame is {}, but you've passed {}", data.start_frame + data.frame_count, end);
     }
     let pb = ProgressBar::new((end - start) as u64);
+    pb.set_style(
+        ProgressStyle::with_template(&PROGRESS_BAR_STYLE)
+            .expect("Can't set style for progress bar")
+            .progress_chars(PROGRESS_BAR_SYMBOLS)
+    );
+    pb.set_prefix("Solving macro steps: ");
     for i in (start..end).step_by(step) {
         let state = data.frames.get(&i)
             .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());

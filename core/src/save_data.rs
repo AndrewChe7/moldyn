@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Mutex;
 use na::Vector3;
@@ -268,13 +269,15 @@ impl DataFile {
         } else {
             File::open(path)
         }.expect("Can't write to file");
-        serde_json::ser::to_writer_pretty(file, &self)
+        let mut buf_writer = BufWriter::new(file);
+        serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
             .expect("Can't save data to file");
     }
 
     pub fn load_from_file (path: &Path) -> Self {
         let file = File::open(path).expect("Can't open file to read");
-        let data_file: Self = serde_json::de::from_reader(&file).expect("Can't read file");
+        let buf_reader = BufReader::new(file);
+        let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
         data_file
     }
 

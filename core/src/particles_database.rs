@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::option::Option;
 use std::path::Path;
 use std::string::String;
@@ -88,10 +89,11 @@ impl ParticleDatabase {
             return Err(SaveLoadError::CantOpen);
         }
         let file = file.unwrap();
+        let mut buf_writer = BufWriter::new(file);
         {
             let particle_data_locked = PARTICLE_DATA.lock().expect("Can't lock mutex");
             let data = &*particle_data_locked;
-            let res = serde_json::ser::to_writer_pretty(file, data);
+            let res = serde_json::ser::to_writer_pretty(&mut buf_writer, data);
             if res.is_err() {
                 return Err(SaveLoadError::CantWrite);
             }
@@ -105,7 +107,8 @@ impl ParticleDatabase {
             return Err(SaveLoadError::CantOpen);
         }
         let file = file.unwrap();
-        let res = serde_json::de::from_reader(file);
+        let buf_reader = BufReader::new(file);
+        let res = serde_json::de::from_reader(buf_reader);
         if res.is_err() {
             return Err(SaveLoadError::CantRead);
         }

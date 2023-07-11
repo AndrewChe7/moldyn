@@ -4,6 +4,7 @@ use rayon::prelude::*;
 use std::sync::Mutex;
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 use rand_distr::num_traits::Pow;
 use serde::{Deserialize, Serialize};
@@ -133,13 +134,15 @@ pub fn save_potentials_to_file (path: &PathBuf) {
     } else {
         File::create(path).expect("Can't create file")
     };
-    serde_json::ser::to_writer_pretty(file, &db.clone())
+    let mut buf_writer = BufWriter::new(file);
+    serde_json::ser::to_writer_pretty(&mut buf_writer, &db.clone())
         .expect("Can't save potential settings");
 }
 
 pub fn load_potentials_from_file (path: &PathBuf) {
     let file = File::open(path).expect("Can't open file");
-    let data: HashMap<(u16, u16), Potential> = serde_json::de::from_reader(&file)
+    let buf_reader = BufReader::new(file);
+    let data: HashMap<(u16, u16), Potential> = serde_json::de::from_reader(buf_reader)
         .expect("Can't load data from file");
     let mut db = POTENTIALS_DATA.lock()
         .expect("Can't lock potentials database");
