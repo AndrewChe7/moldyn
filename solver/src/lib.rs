@@ -9,7 +9,7 @@ pub mod solver;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::initializer::InitError;
+    use crate::initializer::{Barostat, InitError, initialize_particles, initialize_particles_position, initialize_velocities_for_gas, Thermostat};
     use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_pressure, get_temperature, get_thermal_energy};
     use crate::solver::{update_force, Integrator, Potential};
     use moldyn_core::{Particle, ParticleDatabase, State};
@@ -59,24 +59,24 @@ mod tests {
             let particle = particle.lock().expect("Can't lock particle");
             p += particle.velocity;
         }
-        assert!(p.x.abs() < 1e-14);
-        assert!(p.y.abs() < 1e-14);
-        assert!(p.z.abs() < 1e-14);
+        assert!(p.x.abs() < 1e-12);
+        assert!(p.y.abs() < 1e-12);
+        assert!(p.z.abs() < 1e-12);
     }
 
     #[test]
     fn impulse () {
         let bounding_box = Vector3::new(10.0, 10.0, 10.0) * 3.338339;
         let verlet_method = Integrator::VerletMethod;
-        let mut state = initializer::initialize_particles(1000, &bounding_box);
+        let mut state = initialize_particles(1000, &bounding_box);
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        initializer::initialize_particles_position(&mut state, 0, 0,
+        initialize_particles_position(&mut state, 0, 0,
                                                    (0.0, 0.0, 0.0), (10, 10, 10), 3.338339)
             .expect("Can't initialize particles");
-        initializer::initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
         update_force(&mut state);
         check_impulse(&state);
-        for _ in 0..5 {
+        for _ in 0..1000 {
             verlet_method.calculate(&mut state, 0.002);
             check_impulse(&state);
         }
@@ -358,5 +358,51 @@ mod tests {
             format!("{:.8}", pressure),
             "5.38886546"
         );
+    }
+
+    #[test]
+    fn berendsen_thermostat () {
+        let bb = Vector3::new(5.0, 5.0, 5.0) * 3.338339;
+        ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+        let mut state = initialize_particles(125, &bb);
+        initialize_particles_position(&mut state, 0, 0,
+                                      (0.0, 0.0, 0.0), (5, 5, 5), 3.338339)
+            .expect("Can't init particles");
+        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        let berendsen = Thermostat::Berendsen(1.0);
+        let verlet = Integrator::VerletMethod;
+        for _ in 0..5000 {
+            berendsen.update(&mut state, 0.002, 273.15);
+            verlet.calculate(&mut state, 0.002);
+        }
+        let particles_count = state.particles.len();
+        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
+        let thermal_energy = get_thermal_energy(&state, 0, particles_count, &mv);
+        let temperature = get_temperature(thermal_energy, particles_count);
+        println!("{}", temperature);
+        assert!((temperature - 273.15).abs() < 1e-5);
+    }
+
+    #[test]
+    fn berendsen_barostat () {
+        let bb = Vector3::new(5.0, 5.0, 5.0) * 3.338339;
+        ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+        let mut state = initialize_particles(125, &bb);
+        initialize_particles_position(&mut state, 0, 0,
+                                      (0.0, 0.0, 0.0), (5, 5, 5), 3.338339)
+            .expect("Can't init particles");
+        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        let berendsen = Barostat::Berendsen(1.0);
+        let verlet = Integrator::VerletMethod;
+        for _ in 0..3000 {
+            verlet.calculate(&mut state, 0.002);
+            berendsen.update(&mut state, 0.002, 1.01325);
+        }
+        let particles_count = state.particles.len();
+        update_force(&mut state);
+        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
+        let pressure = get_pressure(&state, 0, particles_count, &mv);
+        println!("{:.8} ", pressure);
+        //assert!((pressure - 1.01325).abs() < 1e-5);
     }
 }

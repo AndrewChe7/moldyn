@@ -17,7 +17,7 @@ pub enum Potential {
         r_cut: f64,
         u_cut: f64,
     },
-    Custom{
+    Custom {
         name: String,
         custom_data: Vec<f64>,
     },
@@ -73,10 +73,22 @@ impl Potential {
             }
         }
     }
+
+    pub fn get_radius_cut(&self) -> f64 {
+        match self {
+            Potential::LennardJones { r_cut, .. } => {
+                r_cut.clone()
+            }
+            Potential::Custom { .. } => {
+                todo!()
+            }
+        }
+    }
 }
 
 lazy_static! {
     static ref POTENTIALS_DATA: Mutex<HashMap<(u16, u16), Potential>> = Mutex::new(HashMap::new());
+    static ref DEFAULT_POTENTIAL: Potential = Potential::new_lennard_jones(0.3418, 1.712);
 }
 
 pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
@@ -89,7 +101,7 @@ pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
     if let Some(potential) = potential {
         potential.clone()
     } else {
-        Potential::new_lennard_jones(0.3418, 1.712)
+        DEFAULT_POTENTIAL.clone()
     }
 }
 
@@ -106,8 +118,25 @@ pub fn update_force(state: &mut State) {
 
     (0..number_particles).into_par_iter().for_each(|i| {
         for j in 0..i {
-            let r = state.get_least_r(i, j);
             let potential = get_potential(state, i, j);
+            let near = {
+                let r_cut = potential.get_radius_cut();
+                let bb = state.boundary_box;
+                let p1 = state.particles[i].lock().expect("Can't lock particle");
+                let p2 = state.particles[j].lock().expect("Can't lock particle");
+                let radius_vector = p1.position - p2.position;
+                let x = radius_vector.x.abs();
+                let y = radius_vector.y.abs();
+                let z = radius_vector.z.abs();
+                let x = x.min(bb.x - x);
+                let y = y.min(bb.y - y);
+                let z = z.min(bb.z - z);
+                x < r_cut && y < r_cut && z < r_cut
+            };
+            if !near {
+                continue;
+            }
+            let r = state.get_least_r(i, j);
             let (potential, force) = potential.get_potential_and_force(r.magnitude());
             let force_vec = r.normalize() * force;
             let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
