@@ -26,8 +26,24 @@ pub enum CrystalCellType {
 
 #[derive(Clone, ValueEnum)]
 pub enum IntegratorChoose {
-    /// I think you know what it is
+    /// https://doi.org/10.1103/PhysRev.159.98
     VerletMethod,
+    /// Custom method
+    Custom,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum BarostatChoose {
+    /// https://pure.rug.nl/ws/files/64380902/1.448118.pdf
+    Berendsen,
+    /// Custom method
+    Custom,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum ThermostatChoose {
+    /// https://pure.rug.nl/ws/files/64380902/1.448118.pdf
+    Berendsen,
     /// Custom method
     Custom,
 }
@@ -69,6 +85,24 @@ pub enum Commands {
         /// if integrate method is custom, this parameter must be set
         #[arg(long)]
         custom_method: Option<String>,
+        /// Barostat type
+        #[arg(long)]
+        barostat: Option<BarostatChoose>,
+        /// Barostat parameters
+        #[arg(long, num_args = 1..5, value_delimiter = ' ')]
+        barostat_params: Option<Vec<f64>>,
+        /// Barostat target pressure (Pa)
+        #[arg(short = 'P', long)]
+        pressure: Option<f64>,
+        /// Thermostat type
+        #[arg(long)]
+        thermostat: Option<ThermostatChoose>,
+        /// Thermostat parameters
+        #[arg(long, num_args = 1..5, value_delimiter = ' ')]
+        thermostat_params: Option<Vec<f64>>,
+        /// Thermostat target temperature (in K)
+        #[arg(short = 'T', long)]
+        temperature: Option<f64>,
         /// file with potentials for any id pair
         #[arg(short = 'p', long)]
         potentials_file: Option<PathBuf>,

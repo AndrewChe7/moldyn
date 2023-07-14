@@ -11,8 +11,8 @@ mod tests {
     use super::*;
     use crate::initializer::{Barostat, InitError, initialize_particles, initialize_particles_position, initialize_velocities_for_gas, Thermostat};
     use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_pressure, get_temperature, get_thermal_energy};
-    use crate::solver::{update_force, Integrator, Potential};
     use moldyn_core::{Particle, ParticleDatabase, State};
+    use crate::solver::*;
     use na::Vector3;
     use std::sync::Mutex;
 
@@ -66,18 +66,18 @@ mod tests {
 
     #[test]
     fn impulse () {
-        let bounding_box = Vector3::new(10.0, 10.0, 10.0) * 3.338339;
+        let bounding_box = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         let verlet_method = Integrator::VerletMethod;
-        let mut state = initialize_particles(1000, &bounding_box);
+        let mut state = initialize_particles(8, &bounding_box);
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         initialize_particles_position(&mut state, 0, 0,
-                                                   (0.0, 0.0, 0.0), (10, 10, 10), 3.338339)
+                                                   (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't initialize particles");
         initialize_velocities_for_gas(&mut state, 273.15, 66.335);
         update_force(&mut state);
         check_impulse(&state);
-        for _ in 0..1000 {
-            verlet_method.calculate(&mut state, 0.002);
+        for _ in 0..100000 {
+            verlet_method.calculate(&mut state, 0.002, None, None);
             check_impulse(&state);
         }
     }
@@ -165,7 +165,7 @@ mod tests {
             assert_eq!(format!("{:.8}", f2.y), "0.00000000");
             assert_eq!(format!("{:.8}", f2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002);
+        verlet.calculate(&mut state, 0.002, None, None);
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
@@ -199,7 +199,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002);
+        verlet.calculate(&mut state, 0.002, None, None);
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
@@ -233,7 +233,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002);
+        verlet.calculate(&mut state, 0.002, None, None);
         {
             let p1 = state.particles[0].lock().expect("Can't lock particle");
             let p2 = state.particles[1].lock().expect("Can't lock particle");
@@ -362,18 +362,21 @@ mod tests {
 
     #[test]
     fn berendsen_thermostat () {
-        let bb = Vector3::new(5.0, 5.0, 5.0) * 3.338339;
+        let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(125, &bb);
+        let mut state = initialize_particles(8, &bb);
         initialize_particles_position(&mut state, 0, 0,
-                                      (0.0, 0.0, 0.0), (5, 5, 5), 3.338339)
+                                      (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
         initialize_velocities_for_gas(&mut state, 273.15, 66.335);
-        let berendsen = Thermostat::Berendsen(1.0);
+        update_force(&mut state);
+        let mut berendsen = Thermostat::Berendsen {
+            tau: 0.5,
+            lambda: 0.0,
+        };
         let verlet = Integrator::VerletMethod;
-        for _ in 0..5000 {
-            berendsen.update(&mut state, 0.002, 273.15);
-            verlet.calculate(&mut state, 0.002);
+        for _ in 0..100000 {
+            verlet.calculate(&mut state, 0.002, None, Some((&mut berendsen, 273.15)));
         }
         let particles_count = state.particles.len();
         let mv = get_center_of_mass_velocity(&state, 0, particles_count);
@@ -385,24 +388,28 @@ mod tests {
 
     #[test]
     fn berendsen_barostat () {
-        let bb = Vector3::new(5.0, 5.0, 5.0) * 3.338339;
+        let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(125, &bb);
+        let mut state = initialize_particles(8, &bb);
         initialize_particles_position(&mut state, 0, 0,
-                                      (0.0, 0.0, 0.0), (5, 5, 5), 3.338339)
+                                      (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
         initialize_velocities_for_gas(&mut state, 273.15, 66.335);
-        let berendsen = Barostat::Berendsen(1.0);
-        let verlet = Integrator::VerletMethod;
-        for _ in 0..3000 {
-            verlet.calculate(&mut state, 0.002);
-            berendsen.update(&mut state, 0.002, 1.01325);
-        }
-        let particles_count = state.particles.len();
         update_force(&mut state);
+        let mut berendsen = Barostat::Berendsen {
+            beta: 1.0,
+            tau: 0.1,
+            myu: 0.0,
+        };
+        let verlet = Integrator::VerletMethod;
+        for _ in 0..100000 {
+            verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 1.01325)), None);
+        }
+        update_force(&mut state);
+        let particles_count = state.particles.len();
         let mv = get_center_of_mass_velocity(&state, 0, particles_count);
         let pressure = get_pressure(&state, 0, particles_count, &mv);
-        println!("{:.8} ", pressure);
-        //assert!((pressure - 1.01325).abs() < 1e-5);
+        println!("{:.15} ", pressure);
+        assert!((pressure - 1.01325).abs() < 1e-5);
     }
 }

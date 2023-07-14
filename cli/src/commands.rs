@@ -3,7 +3,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use moldyn_core::{DataFile, MacroParameterType, ParticleDatabase};
 use moldyn_solver::solver::{Integrator, update_force};
-use crate::args::{CrystalCellType, IntegratorChoose};
+use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, ThermostatChoose};
 
 
 const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
@@ -69,7 +69,13 @@ pub fn solve(in_file: &PathBuf,
              iteration_count: usize,
              delta_time: &f64,
              pretty_print: bool,
-             backup_frequency: usize) {
+             backup_frequency: usize,
+             thermostat_choose: &Option<ThermostatChoose>,
+             thermostat_params: &Option<Vec<f64>>,
+             temperature: &Option<f64>,
+             barostat_choose: &Option<BarostatChoose>,
+             barostat_params: &Option<Vec<f64>>,
+             pressure: &Option<f64>) {
     let mut data = DataFile::load_from_file(in_file);
     ParticleDatabase::load(&data.particles_database);
     let mut state = data.get_last_frame();
@@ -82,6 +88,41 @@ pub fn solve(in_file: &PathBuf,
             todo!()
         }
     };
+    let mut thermostat = if let Some(thermostat_choose) = thermostat_choose {
+        Some(match thermostat_choose {
+                ThermostatChoose::Berendsen => {
+                    moldyn_solver::initializer::Thermostat::Berendsen {
+                        tau: thermostat_params.clone()
+                            .expect("No thermostat parameters. Need tau for Berendsen")
+                            [0],
+                        lambda: 0.0,
+                    }
+                }
+                ThermostatChoose::Custom => {
+                    todo!()
+                }
+        })
+    } else {
+        None
+    };
+    let mut barostat = if let Some(barostat_choose) = barostat_choose {
+        Some(match barostat_choose {
+                BarostatChoose::Berendsen => {
+                    let params = barostat_params.clone()
+                        .expect("No barostat parameters. Need beta and tau for Berendsen");
+                    moldyn_solver::initializer::Barostat::Berendsen {
+                        beta: params[0],
+                        tau: params[1],
+                        myu: 0.0,
+                    }
+                }
+                BarostatChoose::Custom => {
+                    todo!()
+                }
+            })
+    } else {
+        None
+    };
     if let Some(potentials_file) = potentials_file {
         moldyn_solver::solver::load_potentials_from_file(potentials_file);
     }
@@ -92,11 +133,31 @@ pub fn solve(in_file: &PathBuf,
             .progress_chars(PROGRESS_BAR_SYMBOLS)
     );
     pb.set_prefix("Solving steps: ");
+    let pressure = if barostat.is_some() {
+        pressure.expect("No pressure was passed")
+    } else {
+        0.0
+    };
+    let temperature = if thermostat.is_some() {
+        temperature.expect("No temperature was passed")
+    } else {
+        0.0
+    };
     for i in 0..iteration_count {
         if i > 0 && i % backup_frequency == 0 {
             backup(&data, out_file, i);
         }
-        integrator.calculate(&mut state, *delta_time);
+        let barostat = if let Some(barostat) = &mut barostat {
+            Some((barostat, pressure))
+        } else {
+            None
+        };
+        let thermostat = if let Some(thermostat) = &mut thermostat {
+            Some((thermostat, temperature))
+        } else {
+            None
+        };
+        integrator.calculate(&mut state, *delta_time, barostat, thermostat);
         data.add_state(&state);
         pb.inc(1);
     }

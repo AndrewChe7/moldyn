@@ -32,10 +32,18 @@ fn main() {
             potentials_file,
             iteration_count,
             delta_time,
+            thermostat,
+            thermostat_params,
+            temperature,
+            barostat,
+            barostat_params,
+            pressure,
         } => {
             solve(&args.file, out_file, integrate_method,
                   custom_method, potentials_file, *iteration_count,
-                  delta_time, args.pretty_print, args.backup);
+                  delta_time, args.pretty_print, args.backup,
+                  thermostat, thermostat_params, temperature,
+                  barostat, barostat_params, pressure);
         }
         Commands::SolveMacroParameters {
             out_file,
