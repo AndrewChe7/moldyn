@@ -12,7 +12,7 @@ pub struct Camera {
 
 fn get_right_up(forward: &Vector3<f32>, fovy: f32, width: u32, height: u32)
     -> (Vector3<f32>, Vector3<f32>) {
-    let world_up = Vector3::new(0.0, 1.0, 0.0);
+    let world_up = Vector3::new(0.0, -1.0, 0.0);
     let mut right = forward.cross(world_up).normalize();
     let mut up = forward.cross(right).normalize();
     let angle_up = fovy.to_radians() / 2.0;
