@@ -4,7 +4,6 @@ mod save_data;
 
 extern crate lazy_static;
 extern crate nalgebra as na;
-extern crate rayon;
 extern crate serde;
 
 pub use particle::Particle;
@@ -19,7 +18,6 @@ mod tests {
     use crate::{Particle, ParticleDatabase, ParticleToSave, State, StateToSave};
     use na::Vector3;
     use rand::Rng;
-    use rayon::prelude::*;
     use std::path::Path;
     use std::sync::RwLock;
 
@@ -82,14 +80,14 @@ mod tests {
 
     #[test]
     fn particle_database_multithreaded() {
-        let _ = (0..4).into_par_iter().for_each(|i| {
+        let _ = (0..4).into_iter().for_each(|i| {
             ParticleDatabase::add(i, "test_particle", 0.1337, 0.01337);
         });
         assert_eq!(ParticleDatabase::get_particle_mass(0).unwrap(), 0.1337);
         assert_eq!(ParticleDatabase::get_particle_mass(1).unwrap(), 0.1337);
         assert_eq!(ParticleDatabase::get_particle_mass(2).unwrap(), 0.1337);
         assert_eq!(ParticleDatabase::get_particle_mass(3).unwrap(), 0.1337);
-        let _ = (0..4).into_par_iter().for_each(|i| {
+        let _ = (0..4).into_iter().for_each(|i| {
             assert_eq!(ParticleDatabase::get_particle_mass(i).unwrap(), 0.1337);
         });
     }
@@ -112,7 +110,7 @@ mod tests {
     fn check_boundary_conditions(state: &State) -> bool {
         let bb = &state.boundary_box;
         let slice = state.particles.as_slice();
-        slice.into_par_iter().all(|particle| {
+        slice.into_iter().all(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             particle.position.x >= 0.0
                 && particle.position.x <= bb.x

@@ -1,7 +1,6 @@
 extern crate moldyn_core;
 extern crate nalgebra as na;
 extern crate rand_distr;
-extern crate rayon;
 pub mod initializer;
 pub mod macro_parameters;
 pub mod solver;

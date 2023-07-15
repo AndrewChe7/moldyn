@@ -1,6 +1,5 @@
 use crate::ParticleDatabase;
 use na::Vector3;
-use rayon::prelude::*;
 use std::sync::RwLock;
 
 /// Structure that keeps all data for particle
@@ -123,7 +122,7 @@ impl State {
     pub fn apply_boundary_conditions(&mut self) {
         let bb = &self.boundary_box;
         let slice = self.particles.as_mut_slice();
-        slice.into_par_iter().for_each(|particle| {
+        slice.into_iter().for_each(|particle| {
             let particle = particle.get_mut().expect("Can't lock particle");
             particle.position.x = particle.position.x.rem_euclid(bb.x);
             particle.position.y = particle.position.y.rem_euclid(bb.y);

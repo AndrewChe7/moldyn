@@ -1,5 +1,4 @@
 use moldyn_core::State;
-use rayon::prelude::*;
 use crate::initializer::{Barostat, Thermostat};
 use crate::solver::update_force;
 
@@ -19,7 +18,7 @@ impl Integrator {
                 if let Some((thermostat, target_temperature)) = thermostat.as_mut() {
                     thermostat.calculate_lambda(&state, delta_time, *target_temperature);
                 }
-                state.particles.par_iter_mut().for_each(|particle| {
+                state.particles.iter_mut().for_each(|particle| {
                     let particle = particle.get_mut().expect("Can't lock particle");
                     let acceleration = particle.force / particle.mass;
                     particle.position +=
@@ -34,7 +33,7 @@ impl Integrator {
                     thermostat.update(state, delta_time, *target_temperature);
                 }
                 update_force(state);
-                state.particles.par_iter_mut().for_each(|particle| {
+                state.particles.iter_mut().for_each(|particle| {
                     let particle = particle.get_mut().expect("Can't lock particle");
                     let acceleration = particle.force / particle.mass;
                     particle.velocity += acceleration * delta_time / 2.0;

@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
 use moldyn_core::State;
-use rayon::prelude::*;
 use std::sync::RwLock;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -107,7 +106,7 @@ pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
 
 pub fn update_force(state: &mut State) {
     let number_particles = state.particles.len();
-    state.particles.par_iter_mut().for_each(|particle| {
+    state.particles.iter_mut().for_each(|particle| {
         let particle = particle.get_mut().expect("Can't lock particle");
         particle.force.x = 0.0;
         particle.force.y = 0.0;
@@ -116,7 +115,7 @@ pub fn update_force(state: &mut State) {
         particle.temp = 0.0;
     });
 
-    (0..number_particles).into_par_iter().for_each(|i| {
+    (0..number_particles).into_iter().for_each(|i| {
         for j in 0..i {
             let potential = get_potential(state, i, j);
             let near = {

@@ -5,7 +5,6 @@ mod pressure;
 pub use energy::*;
 use moldyn_core::State;
 use na::{Vector3, Vector4};
-use rayon::prelude::*;
 pub use temperature::*;
 pub use pressure::*;
 
@@ -17,7 +16,7 @@ pub fn get_center_of_mass_velocity(
 ) -> Vector3<f64> {
     let slice = &state.particles[first_particle..(first_particle + count)];
     let res: Vector4<f64> = slice
-        .into_par_iter()
+        .into_iter()
         .map(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             let v = particle.velocity;

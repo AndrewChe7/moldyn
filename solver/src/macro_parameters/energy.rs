@@ -1,6 +1,5 @@
 use moldyn_core::{Particle, State};
 use na::Vector3;
-use rayon::prelude::*;
 
 fn particle_kinetic_energy(particle: &Particle) -> f64 {
     particle.mass * particle.velocity.dot(&particle.velocity) / 2.0
@@ -14,7 +13,7 @@ fn particle_thermal_energy(particle: &Particle, center_of_mass_velocity: &Vector
 pub fn get_kinetic_energy(state: &State, first_particle: usize, count: usize) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     slice
-        .par_iter()
+        .iter()
         .map(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             particle_kinetic_energy(&particle)
@@ -30,7 +29,7 @@ pub fn get_thermal_energy(
 ) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     slice
-        .par_iter()
+        .iter()
         .map(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             particle_thermal_energy(&particle, center_of_mass_velocity)
@@ -41,7 +40,7 @@ pub fn get_thermal_energy(
 pub fn get_potential_energy(state: &State, first_particle: usize, count: usize) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     let res: f64 = slice
-        .par_iter()
+        .iter()
         .map(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             particle.potential
