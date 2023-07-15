@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use moldyn_core::State;
-use std::sync::RwLock;
+use std::sync::{RwLock, Arc};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
@@ -53,13 +53,13 @@ impl Potential {
         potential
     }
 
-    pub fn get_potential_and_force(self, r: f64) -> (f64, f64) {
+    pub fn get_potential_and_force(&self, r: f64) -> (f64, f64) {
         match self {
             Potential::LennardJones { sigma, eps, r_cut, u_cut } => {
-                if r > r_cut {
+                if r > *r_cut {
                     return (0.0, 0.0);
                 }
-                let sigma_r = sigma / r;
+                let sigma_r = *sigma / r;
                 let sigma_r_6 = sigma_r.pow(6);
                 let sigma_r_12 = sigma_r_6 * sigma_r_6;
                 (
@@ -86,21 +86,18 @@ impl Potential {
 }
 
 lazy_static! {
-    static ref POTENTIALS_DATA: RwLock<HashMap<(u16, u16), Potential>> = RwLock::new(HashMap::new());
-    static ref DEFAULT_POTENTIAL: Potential = Potential::new_lennard_jones(0.3418, 1.712);
+    static ref POTENTIALS_DATA: RwLock<HashMap<(u16, u16), Arc<Potential>>> = RwLock::new(HashMap::new());
+    static ref DEFAULT_POTENTIAL: Arc<Potential> = Arc::new(Potential::new_lennard_jones(0.3418, 1.712));
 }
 
-pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
+pub fn get_potential(id0: u16, id1: u16) -> Arc<Potential> {
     let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
-    let id0 = state.particles[i].read().expect("Can't lock particle").id;
-    let id1 = state.particles[j].read().expect("Can't lock particle").id;
     let key = if id0 > id1 { (id1, id0) } else { (id0, id1) };
-    let potential = db.get(&key);
-    if let Some(potential) = potential {
-        potential.clone()
+    if db.contains_key(&key) {
+        Arc::clone(db.get(&key).unwrap())
     } else {
-        DEFAULT_POTENTIAL.clone()
+        Arc::clone(&DEFAULT_POTENTIAL)
     }
 }
 
@@ -116,13 +113,14 @@ pub fn update_force(state: &mut State) {
     });
 
     (0..number_particles).into_iter().for_each(|i| {
+        let mut p1 = state.particles[i].write().expect("Can't lock particle");
         for j in 0..i {
-            let potential = get_potential(state, i, j);
+            let mut p2 = state.particles[j].write().expect("Can't lock particle");
+            let potential = get_potential(p1.id, p2.id);
             let near = {
                 let r_cut = potential.get_radius_cut();
                 let bb = state.boundary_box;
-                let p1 = state.particles[i].read().expect("Can't lock particle");
-                let p2 = state.particles[j].read().expect("Can't lock particle");
+
                 let radius_vector = p1.position - p2.position;
                 let x = radius_vector.x.abs();
                 let y = radius_vector.y.abs();
@@ -140,13 +138,13 @@ pub fn update_force(state: &mut State) {
             let force_vec = r.normalize() * force;
             let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
             {
-                let mut p1 = state.particles[i].write().expect("Can't lock particle");
+
                 p1.force += force_vec;
                 p1.potential += potential;
                 p1.temp += t;
             }
             {
-                let mut p2 = state.particles[j].write().expect("Can't lock particle");
+
                 p2.force -= force_vec;
                 p2.potential += potential;
             }
@@ -157,13 +155,17 @@ pub fn update_force(state: &mut State) {
 pub fn save_potentials_to_file (path: &PathBuf) {
     let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
+    let mut new_db: HashMap<(u16, u16), Potential> = HashMap::new();
+    for (k, v) in db.iter() {
+        new_db.insert(k.clone(), v.as_ref().clone()).unwrap();
+    }
     let file = if path.exists() {
         OpenOptions::new().truncate(true).write(true).open(path).expect("Can't open file")
     } else {
         File::create(path).expect("Can't create file")
     };
     let mut buf_writer = BufWriter::new(file);
-    serde_json::ser::to_writer_pretty(&mut buf_writer, &db.clone())
+    serde_json::ser::to_writer_pretty(&mut buf_writer, &new_db)
         .expect("Can't save potential settings");
 }
 
@@ -175,6 +177,6 @@ pub fn load_potentials_from_file (path: &PathBuf) {
     let mut db = POTENTIALS_DATA.write()
         .expect("Can't lock potentials database");
     for (id, potential) in data {
-        db.insert(id, potential);
+        db.insert(id, Arc::new(potential));
     }
 }

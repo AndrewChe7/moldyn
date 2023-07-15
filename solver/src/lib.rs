@@ -401,7 +401,7 @@ mod tests {
             myu: 0.0,
         };
         let verlet = Integrator::VerletMethod;
-        for _ in 0..100000 {
+        for _ in 0..500000 {
             verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 1.01325)), None);
         }
         update_force(&mut state);

@@ -83,38 +83,22 @@ impl State {
     pub fn get_least_r(&self, i: usize, j: usize) -> Vector3<f64> {
         let p1 = self.particles[i].read().expect("Can't lock particle");
         let p2 = self.particles[j].read().expect("Can't lock particle");
-        let mut min_pbc = Vector3::new(-1, -1, -1);
-        let mut max_pbc = Vector3::new(1, 1, 1);
         let bb = &self.boundary_box;
-        if p1.position.x < bb.x / 2.0 || p2.position.x > bb.x / 2.0 {
-            max_pbc.x = 0;
-        }
-        if p1.position.y < bb.y / 2.0 || p2.position.y > bb.y / 2.0 {
-            max_pbc.y = 0;
-        }
-        if p1.position.z < bb.z / 2.0 || p2.position.z > bb.z / 2.0 {
-            max_pbc.z = 0;
-        }
-        if p1.position.x > bb.x / 2.0 || p2.position.x < bb.x / 2.0 {
-            min_pbc.x = 0;
-        }
-        if p1.position.y > bb.y / 2.0 || p2.position.y < bb.y / 2.0 {
-            min_pbc.y = 0;
-        }
-        if p1.position.z > bb.z / 2.0 || p2.position.z < bb.z / 2.0 {
-            min_pbc.z = 0;
-        }
         let mut res = p2.position - p1.position;
-        for x in min_pbc.x..(max_pbc.x + 1) {
-            for y in min_pbc.y..(max_pbc.y + 1) {
-                for z in min_pbc.z..(max_pbc.z + 1) {
-                    let offset = Vector3::new(x as f64 * bb.x, y as f64 * bb.y, z as f64 * bb.z);
-                    let r = p2.position - (p1.position + offset);
-                    if r.magnitude_squared() < res.magnitude_squared() {
-                        res = r;
-                    }
-                }
-            }
+        if res.x < -bb.x / 2.0 {
+            res.x += bb.x;
+        } else if res.x > bb.x / 2.0 {
+            res.x -= bb.x;
+        }
+        if res.y < -bb.y / 2.0 {
+            res.y += bb.y;
+        } else if res.y > bb.y / 2.0 {
+            res.y -= bb.y;
+        }
+        if res.z < -bb.z / 2.0 {
+            res.z += bb.z;
+        } else if res.z > bb.z / 2.0 {
+            res.z -= bb.z;
         }
         res
     }
