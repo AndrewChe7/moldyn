@@ -15,6 +15,7 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use moldyn_core::{Particle, ParticleDatabase};
+use moldyn_solver::solver::Integrator;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 #[cfg(target_arch = "wasm32")]
@@ -51,6 +52,7 @@ const BOX_INDICES: &[u16] = &[
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 struct ParticleDataLite {
     position: [f32; 4],
+    velocity: [f32; 4],
     mass_radius_id: [f32; 4],
 }
 
@@ -67,6 +69,33 @@ struct BoundingBox {
     size: [f32; 4],
 }
 
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum VisualizationParameterType {
+    Type = 0,
+    Velocity = 1,
+    Pressure = 2,
+}
+
+#[repr(C, align(16))]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct VisualizationParameter {
+    gradient_color_min: [f32; 4],
+    gradient_color_mid: [f32; 4],
+    gradient_color_max: [f32; 4],
+    gradient_min_max: [f32; 4],
+    visualization_parameter_type: [u32; 4],
+}
+
+pub struct UiData {
+    pub color_0: [u8; 3],
+    pub color_05: [u8; 3],
+    pub color_1: [u8; 3],
+    pub gradient_min: f32,
+    pub gradient_max: f32,
+    pub visualization_parameter_type: VisualizationParameterType,
+}
+
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -76,6 +105,9 @@ struct State {
     window: Window,
     camera: Camera,
     camera_controller: CameraController,
+    ui_data: UiData,
+    visualization_parameter_buffer: wgpu::Buffer,
+    visualization_parameter_bind_group: wgpu::BindGroup,
     particles_data: Vec<ParticleDataLite>,
     particles_center: (f32, f32, f32),
     particles_bounding_box: BoundingBox,
@@ -147,11 +179,12 @@ pub async fn visualizer_window() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut state = State::new(window).await;
-    let mut particles_state = moldyn_solver::initializer::initialize_particles(&[27000], &(Vector3::new(30.0, 30.0, 30.0) * 3.338339));
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+    let verlet = Integrator::VerletMethod;
+    let mut state = State::new(window).await;
+    let mut particles_state = moldyn_solver::initializer::initialize_particles(&[125], &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
     moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, (0.0, 0.0, 0.0),
-                                                              (30, 30, 30), 3.338339).expect("Can't init positions");
+                                                              (5, 5, 5), 3.338339).expect("Can't init positions");
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 0);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
@@ -191,6 +224,8 @@ pub async fn visualizer_window() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
+                verlet.calculate(&mut particles_state, 0.002, None, None);
+                state.update_particle_state(&particles_state);
                 state.update();
                 match state.render() {
                     Ok(_) => {}
@@ -236,15 +271,22 @@ impl ParticleDataLite {
                     offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 2,
                 },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 3,
+                },
             ],
         }
     }
 
     pub fn from(particle: &Particle) -> ParticleDataLite {
         let position = [particle.position.x as f32, particle.position.y as f32, particle.position.z as f32, 1.0];
+        let velocity = [particle.velocity.x as f32, particle.velocity.y as f32, particle.velocity.z as f32, 1.0];
         let mass_radius_id = [particle.mass as f32, particle.radius as f32, particle.id as f32, 0.0];
         ParticleDataLite {
             position,
+            velocity,
             mass_radius_id,
         }
     }
@@ -337,11 +379,6 @@ impl State {
         let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (config.width, config.height));
         let camera_controller = CameraController::new(0.2);
         let camera_uniform = CameraUniform::from(&camera);
-        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
         let bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
             binding: 0,
             visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
@@ -352,6 +389,45 @@ impl State {
             },
             count: None,
         };
+        let ui_data = UiData {
+            color_0: [0, 0, 0],
+            color_05: [100, 100, 100],
+            color_1: [255, 255, 255],
+            gradient_min: 0.0,
+            gradient_max: 1.0,
+            visualization_parameter_type: VisualizationParameterType::Velocity,
+        };
+        let visualization_parameter = VisualizationParameter {
+            gradient_color_min: [0.0, 0.0, 0.0, 1.0],
+            gradient_color_mid: [0.5, 0.5, 0.5, 1.0],
+            gradient_color_max: [1.0, 1.0, 1.0, 1.0],
+            gradient_min_max: [0.0, 1.0, 0.0, 0.0],
+            visualization_parameter_type: [1, 0, 0, 0],
+        };
+        let visualization_parameter_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Visualization parameter buffer"),
+            contents: bytemuck::cast_slice(&[visualization_parameter]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let visualization_parameter_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Visualization parameter bind group layout"),
+            entries: &[
+                bind_group_layout_entry.clone(),
+            ],
+        });
+        let visualization_parameter_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Visualization parameter bind group"),
+            layout: &visualization_parameter_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: visualization_parameter_buffer.as_entire_binding(),
+            }],
+        });
+        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Camera Buffer"),
+            contents: bytemuck::cast_slice(&[camera_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
         let camera_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -371,7 +447,7 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout],
+                bind_group_layouts: &[&camera_bind_group_layout, &visualization_parameter_bind_group_layout],
                 push_constant_ranges: &[],
             });
         let render_pipeline = device.create_render_pipeline(
@@ -563,6 +639,9 @@ impl State {
             particles_data: vec![],
             particles_center: (0.0, 0.0, 0.0),
             particles_bounding_box: bb_uniform_data,
+            ui_data,
+            visualization_parameter_buffer,
+            visualization_parameter_bind_group,
             camera_buffer,
             camera_bind_group,
             vertex_buffer,
@@ -609,6 +688,48 @@ impl State {
         self.particles_bounding_box = BoundingBox::from(&state);
         self.update_instance_buffer();
         self.update_bounding_box_uniform_buffer();
+    }
+
+    fn update_visualization_parameter (&mut self) {
+        let ui = &self.ui_data;
+        let data = VisualizationParameter {
+            gradient_color_min: [
+                ui.color_0[0] as f32 / 255.0,
+                ui.color_0[1] as f32 / 255.0,
+                ui.color_0[2] as f32 / 255.0,
+                1.0],
+            gradient_color_mid: [
+                ui.color_05[0] as f32 / 255.0,
+                ui.color_05[1] as f32 / 255.0,
+                ui.color_05[2] as f32 / 255.0,
+                1.0],
+            gradient_color_max: [
+                ui.color_1[0] as f32 / 255.0,
+                ui.color_1[1] as f32 / 255.0,
+                ui.color_1[2] as f32 / 255.0,
+                1.0],
+            gradient_min_max: [
+                ui.gradient_min,
+                ui.gradient_max,
+                0.0, 0.0
+            ],
+            visualization_parameter_type: [ui.visualization_parameter_type as u32, 0, 0, 0],
+        };
+        let source_buffer = self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Visualization parameter buffer source"),
+                contents: bytemuck::cast_slice(&[data]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_SRC,
+            }
+        );
+        let mut command_encoder = self.device.create_command_encoder(
+            &wgpu::CommandEncoderDescriptor {
+                label: Some("Loader")
+            });
+        command_encoder.copy_buffer_to_buffer(&source_buffer, 0,
+                                              &self.visualization_parameter_buffer, 0,
+                                              mem::size_of::<VisualizationParameter>() as wgpu::BufferAddress);
+        self.queue.submit(Some(command_encoder.finish()));
     }
 
     fn update_bounding_box_uniform_buffer (&mut self) {
@@ -665,6 +786,7 @@ impl State {
         let center = (self.particles_center.0, self.particles_center.1, self.particles_center.2);
         self.camera_controller.update_camera(&mut self.camera, center, self.config.width, self.config.height);
         self.load_camera_to_buffer();
+        self.update_visualization_parameter();
     }
 
     fn load_camera_to_buffer(&mut self) {
@@ -758,6 +880,7 @@ impl State {
             let buffer_size = self.particles_data.len() as u32;
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.visualization_parameter_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
@@ -774,7 +897,7 @@ impl State {
             self.platform.begin_frame();
             let ctx = &self.platform.context();
             /////
-            main_window_ui(ctx);
+            main_window_ui(&mut self.ui_data, ctx);
             use egui_gizmo::Gizmo;
             egui::Area::new("Gizmo Area").show(ctx, |ui| {
                 let camera = &self.camera;

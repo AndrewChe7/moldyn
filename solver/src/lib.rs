@@ -392,17 +392,17 @@ mod tests {
         update_force(&mut state);
         let mut berendsen = Barostat::Berendsen {
             beta: 1.0,
-            tau: 1.0,
+            tau: 0.1,
             myu: 0.0,
         };
         let verlet = Integrator::VerletMethod;
         for _ in 0..100000 {
-            verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 1.01325)), None);
+            verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 0.101325)), None);
         }
         update_force(&mut state);
         let mv = get_center_of_mass_velocity(&state, 0);
         let pressure = get_pressure(&state, 0, &mv);
         println!("{:.15} ", pressure);
-        assert!((pressure - 1.01325).abs() < 1e-5);
+        assert!((pressure - 0.101325).abs() < 1e-5);
     }
 }
