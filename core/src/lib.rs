@@ -21,7 +21,7 @@ mod tests {
     use rand::Rng;
     use rayon::prelude::*;
     use std::path::Path;
-    use std::sync::Mutex;
+    use std::sync::RwLock;
 
     fn test_particle() -> Particle {
         ParticleDatabase::add(3, "test", 2.0, 0.2);
@@ -50,7 +50,7 @@ mod tests {
     fn state_serialization() {
         let particle = test_particle();
         let state = State {
-            particles: vec![Mutex::new(test_particle()), Mutex::new(test_particle())],
+            particles: vec![RwLock::new(test_particle()), RwLock::new(test_particle())],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let state_data_to_save = StateToSave::from(&state);
@@ -58,7 +58,7 @@ mod tests {
         let deserialized: StateToSave = serde_json::from_str(&serialized).unwrap();
         let deserialized: State = (&deserialized).into();
         for p in &deserialized.particles {
-            let ref p = p.lock().expect("Can't lock particle");
+            let ref p = p.read().expect("Can't lock particle");
             check_particle_equality(p, &particle);
         }
     }
@@ -113,7 +113,7 @@ mod tests {
         let bb = &state.boundary_box;
         let slice = state.particles.as_slice();
         slice.into_par_iter().all(|particle| {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             particle.position.x >= 0.0
                 && particle.position.x <= bb.x
                 && particle.position.y >= 0.0
@@ -131,7 +131,7 @@ mod tests {
         p.position.y = rng.gen();
         p.position.z = 3.0;
         let mut state = State {
-            particles: vec![Mutex::new(p)],
+            particles: vec![RwLock::new(p)],
             boundary_box: Vector3::new(1.0, 1.0, 1.0),
         };
         assert!(!check_boundary_conditions(&state));

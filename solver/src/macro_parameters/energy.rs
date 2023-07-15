@@ -14,9 +14,9 @@ fn particle_thermal_energy(particle: &Particle, center_of_mass_velocity: &Vector
 pub fn get_kinetic_energy(state: &State, first_particle: usize, count: usize) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     slice
-        .into_par_iter()
+        .par_iter()
         .map(|particle| {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             particle_kinetic_energy(&particle)
         })
         .sum()
@@ -30,9 +30,9 @@ pub fn get_thermal_energy(
 ) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     slice
-        .into_par_iter()
+        .par_iter()
         .map(|particle| {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             particle_thermal_energy(&particle, center_of_mass_velocity)
         })
         .sum()
@@ -41,9 +41,9 @@ pub fn get_thermal_energy(
 pub fn get_potential_energy(state: &State, first_particle: usize, count: usize) -> f64 {
     let slice = &state.particles[first_particle..(first_particle + count)];
     let res: f64 = slice
-        .into_par_iter()
+        .par_iter()
         .map(|particle| {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             particle.potential
         })
         .sum();

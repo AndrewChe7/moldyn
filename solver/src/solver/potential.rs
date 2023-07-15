@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use moldyn_core::State;
 use rayon::prelude::*;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
@@ -87,15 +87,15 @@ impl Potential {
 }
 
 lazy_static! {
-    static ref POTENTIALS_DATA: Mutex<HashMap<(u16, u16), Potential>> = Mutex::new(HashMap::new());
+    static ref POTENTIALS_DATA: RwLock<HashMap<(u16, u16), Potential>> = RwLock::new(HashMap::new());
     static ref DEFAULT_POTENTIAL: Potential = Potential::new_lennard_jones(0.3418, 1.712);
 }
 
 pub fn get_potential(state: &State, i: usize, j: usize) -> Potential {
-    let db = POTENTIALS_DATA.lock()
+    let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
-    let id0 = state.particles[i].lock().expect("Can't lock particle").id;
-    let id1 = state.particles[j].lock().expect("Can't lock particle").id;
+    let id0 = state.particles[i].read().expect("Can't lock particle").id;
+    let id1 = state.particles[j].read().expect("Can't lock particle").id;
     let key = if id0 > id1 { (id1, id0) } else { (id0, id1) };
     let potential = db.get(&key);
     if let Some(potential) = potential {
@@ -122,8 +122,8 @@ pub fn update_force(state: &mut State) {
             let near = {
                 let r_cut = potential.get_radius_cut();
                 let bb = state.boundary_box;
-                let p1 = state.particles[i].lock().expect("Can't lock particle");
-                let p2 = state.particles[j].lock().expect("Can't lock particle");
+                let p1 = state.particles[i].read().expect("Can't lock particle");
+                let p2 = state.particles[j].read().expect("Can't lock particle");
                 let radius_vector = p1.position - p2.position;
                 let x = radius_vector.x.abs();
                 let y = radius_vector.y.abs();
@@ -141,13 +141,13 @@ pub fn update_force(state: &mut State) {
             let force_vec = r.normalize() * force;
             let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
             {
-                let p1 = &mut state.particles[i].lock().expect("Can't lock particle");
+                let mut p1 = state.particles[i].write().expect("Can't lock particle");
                 p1.force += force_vec;
                 p1.potential += potential;
                 p1.temp += t;
             }
             {
-                let p2 = &mut state.particles[j].lock().expect("Can't lock particle");
+                let mut p2 = state.particles[j].write().expect("Can't lock particle");
                 p2.force -= force_vec;
                 p2.potential += potential;
             }
@@ -156,7 +156,7 @@ pub fn update_force(state: &mut State) {
 }
 
 pub fn save_potentials_to_file (path: &PathBuf) {
-    let db = POTENTIALS_DATA.lock()
+    let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
     let file = if path.exists() {
         OpenOptions::new().truncate(true).write(true).open(path).expect("Can't open file")
@@ -173,7 +173,7 @@ pub fn load_potentials_from_file (path: &PathBuf) {
     let buf_reader = BufReader::new(file);
     let data: HashMap<(u16, u16), Potential> = serde_json::de::from_reader(buf_reader)
         .expect("Can't load data from file");
-    let mut db = POTENTIALS_DATA.lock()
+    let mut db = POTENTIALS_DATA.write()
         .expect("Can't lock potentials database");
     for (id, potential) in data {
         db.insert(id, potential);

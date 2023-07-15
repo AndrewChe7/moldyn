@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
 use crate::{Particle, ParticleDatabase, State};
@@ -106,7 +106,7 @@ impl StateToSave {
         let mut particles: HashMap<usize, ParticleToSave> = HashMap::new();
         let boundary_box = state.boundary_box.clone();
         for (i, particle) in state.particles.iter().enumerate() {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             let particle = ParticleToSave {
                 position: particle.position.clone(),
                 velocity: particle.velocity.clone(),
@@ -124,12 +124,12 @@ impl StateToSave {
         let particle_count = self.particles.len();
         let mut particles = vec![];
         for _ in 0..particle_count {
-            particles.push(Mutex::new(Particle::default()));
+            particles.push(RwLock::new(Particle::default()));
         }
         let boundary_box = self.boundary_box.clone();
         for (i, particle) in self.particles.iter() {
             let particle: Particle = particle.into().expect("No particle in database");
-            particles[i.clone()] = Mutex::new(particle);
+            particles[i.clone()] = RwLock::new(particle);
         }
         State {
             particles,
@@ -142,7 +142,7 @@ impl DataFile {
     pub fn init_from_state(state: &State) -> DataFile {
         let particles_database = {
             let particle_database = ParticleDatabase::get_data();
-            let hash_table = particle_database.lock()
+            let hash_table = particle_database.read()
                 .expect("Can't lock particles database");
             hash_table.clone()
         };

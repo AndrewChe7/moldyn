@@ -14,12 +14,12 @@ mod tests {
     use moldyn_core::{Particle, ParticleDatabase, State};
     use crate::solver::*;
     use na::Vector3;
-    use std::sync::Mutex;
+    use std::sync::RwLock;
 
     #[test]
     fn initialize_uniform_grid() {
-        let mut state = initializer::initialize_particles(8, &Vector3::new(4.0, 4.0, 4.0));
-        let res = initializer::initialize_particles_position(
+        let mut state = initialize_particles(8, &Vector3::new(4.0, 4.0, 4.0));
+        let res = initialize_particles_position(
             &mut state,
             0,
             0,
@@ -29,7 +29,7 @@ mod tests {
         );
         assert_eq!(res, Err(InitError::ParticleIdDidNotFound));
         ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
-        let res = initializer::initialize_particles_position(
+        let res = initialize_particles_position(
             &mut state,
             0,
             0,
@@ -38,7 +38,7 @@ mod tests {
             2.0,
         );
         assert_eq!(res, Err(InitError::TooBig));
-        let res = initializer::initialize_particles_position(
+        let res = initialize_particles_position(
             &mut state,
             0,
             0,
@@ -47,7 +47,7 @@ mod tests {
             2.0,
         );
         assert_eq!(res, Ok(()));
-        let particle = state.particles[2].lock().expect("Can't lock particle");
+        let particle = state.particles[2].read().expect("Can't lock particle");
         assert_eq!(particle.position.x, 0.0);
         assert_eq!(particle.position.y, 2.0);
         assert_eq!(particle.position.z, 0.0);
@@ -56,7 +56,7 @@ mod tests {
     fn check_impulse(state: &State) {
         let mut p = Vector3::new(0.0, 0.0, 0.0);
         for particle in &state.particles {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             p += particle.velocity;
         }
         assert!(p.x.abs() < 1e-12);
@@ -102,12 +102,12 @@ mod tests {
         let mut p2 = Particle::default();
         p2.position.x = 0.5;
         let mut state = State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
         let force_p1 = &state.particles[0]
-            .lock()
+            .read()
             .expect("Can't lock particle")
             .force;
         assert_eq!(format!("{:.8}", force_p1.x), "6.67445797");
@@ -126,14 +126,14 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let verlet = Integrator::VerletMethod;
         update_force(&mut state); // Initialize forces
         {
-            let p1 = state.particles[0].lock().expect("Can't lock particle");
-            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let p1 = state.particles[0].read().expect("Can't lock particle");
+            let p2 = state.particles[1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -167,8 +167,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].lock().expect("Can't lock particle");
-            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let p1 = state.particles[0].read().expect("Can't lock particle");
+            let p2 = state.particles[1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -201,8 +201,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].lock().expect("Can't lock particle");
-            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let p1 = state.particles[0].read().expect("Can't lock particle");
+            let p2 = state.particles[1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -235,8 +235,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].lock().expect("Can't lock particle");
-            let p2 = state.particles[1].lock().expect("Can't lock particle");
+            let p1 = state.particles[0].read().expect("Can't lock particle");
+            let p2 = state.particles[1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -280,7 +280,7 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
@@ -324,7 +324,7 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
@@ -348,7 +348,7 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);

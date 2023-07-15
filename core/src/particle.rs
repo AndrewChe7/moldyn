@@ -1,7 +1,7 @@
 use crate::ParticleDatabase;
 use na::Vector3;
 use rayon::prelude::*;
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 /// Structure that keeps all data for particle
 #[derive(Clone, Debug)]
@@ -26,7 +26,7 @@ pub struct Particle {
 
 /// Structure that keeps current state
 pub struct State {
-    pub particles: Vec<Mutex<Particle>>,
+    pub particles: Vec<RwLock<Particle>>,
     pub boundary_box: Vector3<f64>,
 }
 
@@ -67,11 +67,11 @@ impl Default for Particle {
 impl Clone for State {
     fn clone(&self) -> Self {
         let boundary_box = self.boundary_box.clone();
-        let mut particles: Vec<Mutex<Particle>> = vec![];
+        let mut particles: Vec<RwLock<Particle>> = vec![];
         for particle in &self.particles {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             let particle = particle.clone();
-            particles.push(Mutex::new(particle));
+            particles.push(RwLock::new(particle));
         }
         Self {
             particles,
@@ -82,8 +82,8 @@ impl Clone for State {
 
 impl State {
     pub fn get_least_r(&self, i: usize, j: usize) -> Vector3<f64> {
-        let p1 = self.particles[i].lock().expect("Can't lock particle");
-        let p2 = self.particles[j].lock().expect("Can't lock particle");
+        let p1 = self.particles[i].read().expect("Can't lock particle");
+        let p2 = self.particles[j].read().expect("Can't lock particle");
         let mut min_pbc = Vector3::new(-1, -1, -1);
         let mut max_pbc = Vector3::new(1, 1, 1);
         let bb = &self.boundary_box;
@@ -149,7 +149,7 @@ impl Default for State {
                                Vector3::new(0.0, 0.0, 0.0))
             .expect("Can't create particle");
         State {
-            particles: vec![Mutex::new(p1), Mutex::new(p2), Mutex::new(p3)],
+            particles: vec![RwLock::new(p1), RwLock::new(p2), RwLock::new(p3)],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         }
     }

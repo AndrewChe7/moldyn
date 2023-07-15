@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::RwLock;
 use nalgebra::Vector3;
 use tempdir::TempDir;
 use moldyn_core::{DataFile, ParticleDatabase};
@@ -61,20 +61,22 @@ fn solvation() {
                                         Vector3::new(-1.0, 1.0, 0.0))
         .expect("Can't create particle");
     let state = moldyn_core::State {
-        particles: vec![Mutex::new(p1), Mutex::new(p2)],
+        particles: vec![RwLock::new(p1), RwLock::new(p2)],
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
     let data = DataFile::init_from_state(&state);
     data.save_to_file(&path, false);
     solve(&path, &path2, &IntegratorChoose::VerletMethod,
-          &None, &None, 3, &0.002, false, 100);
+          &None, &None, 3, &0.002, false,
+          100, &None, &None, &None,
+          &None, &None, &None);
     let data = DataFile::load_from_file(&path2);
     let mut state = data.get_last_frame();
     update_force(&mut state);
     let p1 = state.particles.get(0).expect("Can't get first particle");
     let p2 = state.particles.get(1).expect("Can't get second particle");
-    let p1 = p1.lock().expect("Can't lock particle");
-    let p2 = p2.lock().expect("Can't lock particle");
+    let p1 = p1.read().expect("Can't lock particle");
+    let p2 = p2.read().expect("Can't lock particle");
     let pos1 = p1.position;
     let pos2 = p2.position;
     let v1 = p1.velocity;

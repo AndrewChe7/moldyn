@@ -19,7 +19,7 @@ pub fn get_center_of_mass_velocity(
     let res: Vector4<f64> = slice
         .into_par_iter()
         .map(|particle| {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             let v = particle.velocity;
             Vector4::new(v.x, v.y, v.z, 1.0) * particle.mass
         })

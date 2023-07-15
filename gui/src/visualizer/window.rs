@@ -424,7 +424,7 @@ impl State {
         let particles_state = moldyn_solver::initializer::initialize_particles(PARTICLE_COUNT, &Vector3::zeros());
         let mut instances = vec![];
         for particle in &particles_state.particles {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             instances.push(ParticleDataLite::from(particle.deref()))
         }
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -591,7 +591,7 @@ impl State {
         let mut center = (0.0, 0.0, 0.0);
         let particle_count = state.particles.len() as f32;
         for particle in &state.particles {
-            let particle = particle.lock().expect("Can't lock particle");
+            let particle = particle.read().expect("Can't lock particle");
             data.push(ParticleDataLite::from(particle.deref()));
             center.0 += particle.position.x as f32 / particle_count;
             center.1 += particle.position.y as f32 / particle_count;

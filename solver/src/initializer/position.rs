@@ -1,6 +1,6 @@
 use moldyn_core::{Particle, ParticleDatabase, State};
 use na::Vector3;
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum InitError {
@@ -10,9 +10,9 @@ pub enum InitError {
 }
 
 pub fn initialize_particles(number_particles: usize, boundary: &Vector3<f64>) -> State {
-    let mut particles: Vec<Mutex<Particle>> = vec![];
+    let mut particles: Vec<RwLock<Particle>> = vec![];
     for _ in 0..number_particles {
-        particles.push(Mutex::new(Particle::default()));
+        particles.push(RwLock::new(Particle::default()));
     }
     State {
         particles,
