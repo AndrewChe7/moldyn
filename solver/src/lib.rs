@@ -17,10 +17,9 @@ mod tests {
 
     #[test]
     fn initialize_uniform_grid() {
-        let mut state = initialize_particles(8, &Vector3::new(4.0, 4.0, 4.0));
+        let mut state = initialize_particles(&[8], &Vector3::new(4.0, 4.0, 4.0));
         let res = initialize_particles_position(
             &mut state,
-            0,
             0,
             (0.0, 0.0, 0.0),
             (2, 2, 2),
@@ -31,7 +30,6 @@ mod tests {
         let res = initialize_particles_position(
             &mut state,
             0,
-            0,
             (0.0, 0.0, 0.0),
             (3, 3, 3),
             2.0,
@@ -40,13 +38,12 @@ mod tests {
         let res = initialize_particles_position(
             &mut state,
             0,
-            0,
             (0.0, 0.0, 0.0),
             (2, 2, 2),
             2.0,
         );
         assert_eq!(res, Ok(()));
-        let particle = state.particles[2].read().expect("Can't lock particle");
+        let particle = state.particles[0][2].read().expect("Can't lock particle");
         assert_eq!(particle.position.x, 0.0);
         assert_eq!(particle.position.y, 2.0);
         assert_eq!(particle.position.z, 0.0);
@@ -54,7 +51,7 @@ mod tests {
 
     fn check_impulse(state: &State) {
         let mut p = Vector3::new(0.0, 0.0, 0.0);
-        for particle in &state.particles {
+        for particle in &state.particles[0] {
             let particle = particle.read().expect("Can't lock particle");
             p += particle.velocity;
         }
@@ -67,12 +64,11 @@ mod tests {
     fn impulse () {
         let bounding_box = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         let verlet_method = Integrator::VerletMethod;
-        let mut state = initialize_particles(8, &bounding_box);
+        let mut state = initialize_particles(&[8], &bounding_box);
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        initialize_particles_position(&mut state, 0, 0,
-                                                   (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
+        initialize_particles_position(&mut state, 0, (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't initialize particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        initialize_velocities_for_gas(&mut state, 273.15, 0);
         update_force(&mut state);
         check_impulse(&state);
         for _ in 0..100000 {
@@ -101,11 +97,11 @@ mod tests {
         let mut p2 = Particle::default();
         p2.position.x = 0.5;
         let mut state = State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
-        let force_p1 = &state.particles[0]
+        let force_p1 = &state.particles[0][0]
             .read()
             .expect("Can't lock particle")
             .force;
@@ -125,14 +121,14 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let verlet = Integrator::VerletMethod;
         update_force(&mut state); // Initialize forces
         {
-            let p1 = state.particles[0].read().expect("Can't lock particle");
-            let p2 = state.particles[1].read().expect("Can't lock particle");
+            let p1 = state.particles[0][0].read().expect("Can't lock particle");
+            let p2 = state.particles[0][1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -166,8 +162,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].read().expect("Can't lock particle");
-            let p2 = state.particles[1].read().expect("Can't lock particle");
+            let p1 = state.particles[0][0].read().expect("Can't lock particle");
+            let p2 = state.particles[0][1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -200,8 +196,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].read().expect("Can't lock particle");
-            let p2 = state.particles[1].read().expect("Can't lock particle");
+            let p1 = state.particles[0][0].read().expect("Can't lock particle");
+            let p2 = state.particles[0][1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -234,8 +230,8 @@ mod tests {
         }
         verlet.calculate(&mut state, 0.002, None, None);
         {
-            let p1 = state.particles[0].read().expect("Can't lock particle");
-            let p2 = state.particles[1].read().expect("Can't lock particle");
+            let p1 = state.particles[0][0].read().expect("Can't lock particle");
+            let p2 = state.particles[0][1].read().expect("Can't lock particle");
             let pos1 = p1.position;
             let pos2 = p2.position;
             let v1 = p1.velocity;
@@ -279,15 +275,15 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
-        let mv = get_center_of_mass_velocity(&state, 0, 2);
+        let mv = get_center_of_mass_velocity(&state, 0);
         assert_eq!(mv, Vector3::new(0.0, 1.0, 0.0));
-        let e_kinetic = get_kinetic_energy(&state, 0, 2);
-        let e_thermal = get_thermal_energy(&state, 0, 2, &mv);
-        let e_potential = get_potential_energy(&state, 0, 2);
+        let e_kinetic = get_kinetic_energy(&state, 0);
+        let e_thermal = get_thermal_energy(&state, 0, &mv);
+        let e_potential = get_potential_energy(&state, 0);
         let e = e_kinetic + e_potential;
         let e_internal = e_thermal + e_potential;
         assert_eq!(
@@ -323,12 +319,12 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
-        let mv = get_center_of_mass_velocity(&state, 0, 2);
-        let e_thermal = get_thermal_energy(&state, 0, 2, &mv);
+        let mv = get_center_of_mass_velocity(&state, 0);
+        let e_thermal = get_thermal_energy(&state, 0, &mv);
         let temperature = get_temperature(e_thermal, 2);
         assert_eq!(
             format!("{:.8}", temperature),
@@ -347,12 +343,12 @@ mod tests {
         p1.mass = 66.335;
         p2.mass = 66.335;
         let mut state = State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         update_force(&mut state);
-        let mv = get_center_of_mass_velocity(&state, 0, 2);
-        let pressure = get_pressure(&state, 0, 2, &mv);
+        let mv = get_center_of_mass_velocity(&state, 0);
+        let pressure = get_pressure(&state, 0, &mv);
         assert_eq!(
             format!("{:.8}", pressure),
             "5.38886546"
@@ -363,11 +359,11 @@ mod tests {
     fn berendsen_thermostat () {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(8, &bb);
-        initialize_particles_position(&mut state, 0, 0,
+        let mut state = initialize_particles(&[8], &bb);
+        initialize_particles_position(&mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        initialize_velocities_for_gas(&mut state, 273.15, 0);
         update_force(&mut state);
         let mut berendsen = Thermostat::Berendsen {
             tau: 0.5,
@@ -377,10 +373,9 @@ mod tests {
         for _ in 0..100000 {
             verlet.calculate(&mut state, 0.002, None, Some((&mut berendsen, 273.15)));
         }
-        let particles_count = state.particles.len();
-        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
-        let thermal_energy = get_thermal_energy(&state, 0, particles_count, &mv);
-        let temperature = get_temperature(thermal_energy, particles_count);
+        let mv = get_center_of_mass_velocity(&state, 0);
+        let thermal_energy = get_thermal_energy(&state, 0, &mv);
+        let temperature = get_temperature(thermal_energy, 8);
         println!("{}", temperature);
         assert!((temperature - 273.15).abs() < 1e-5);
     }
@@ -389,25 +384,24 @@ mod tests {
     fn berendsen_barostat () {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(8, &bb);
-        initialize_particles_position(&mut state, 0, 0,
+        let mut state = initialize_particles(&[8], &bb);
+        initialize_particles_position(&mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 66.335);
+        initialize_velocities_for_gas(&mut state, 273.15, 0);
         update_force(&mut state);
         let mut berendsen = Barostat::Berendsen {
             beta: 1.0,
-            tau: 0.1,
+            tau: 1.0,
             myu: 0.0,
         };
         let verlet = Integrator::VerletMethod;
-        for _ in 0..500000 {
+        for _ in 0..100000 {
             verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 1.01325)), None);
         }
         update_force(&mut state);
-        let particles_count = state.particles.len();
-        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
-        let pressure = get_pressure(&state, 0, particles_count, &mv);
+        let mv = get_center_of_mass_velocity(&state, 0);
+        let pressure = get_pressure(&state, 0, &mv);
         println!("{:.15} ", pressure);
         assert!((pressure - 1.01325).abs() < 1e-5);
     }

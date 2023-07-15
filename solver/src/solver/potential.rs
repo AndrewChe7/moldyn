@@ -102,54 +102,69 @@ pub fn get_potential(id0: u16, id1: u16) -> Arc<Potential> {
 }
 
 pub fn update_force(state: &mut State) {
-    let number_particles = state.particles.len();
-    state.particles.iter_mut().for_each(|particle| {
-        let particle = particle.get_mut().expect("Can't lock particle");
-        particle.force.x = 0.0;
-        particle.force.y = 0.0;
-        particle.force.z = 0.0;
-        particle.potential = 0.0;
-        particle.temp = 0.0;
+    let particle_type_count = state.particles.len();
+    let bb = &state.boundary_box;
+    state.particles.iter_mut().for_each(|particle_type| {
+        particle_type.iter_mut().for_each(|particle| {
+            let particle = particle.get_mut().expect("Can't lock particle");
+            particle.force.x = 0.0;
+            particle.force.y = 0.0;
+            particle.force.z = 0.0;
+            particle.potential = 0.0;
+            particle.temp = 0.0;
+        });
     });
 
-    (0..number_particles).into_iter().for_each(|i| {
-        let mut p1 = state.particles[i].write().expect("Can't lock particle");
-        for j in 0..i {
-            let mut p2 = state.particles[j].write().expect("Can't lock particle");
-            let potential = get_potential(p1.id, p2.id);
-            let near = {
-                let r_cut = potential.get_radius_cut();
-                let bb = state.boundary_box;
+    for particle_type1 in 0..particle_type_count {
+        for particle_type2 in particle_type1..particle_type_count {
+            let potential = get_potential(particle_type1 as u16, particle_type2 as u16);
+            let r_cut = potential.get_radius_cut();
+            let number_particles1 = state.particles[particle_type1].len();
+            (0..number_particles1).into_iter().for_each(|i| {
+                let number_particles2 = if particle_type1 == particle_type2 {
+                    i
+                } else {
+                    state.particles[particle_type2].len()
+                };
+                let mut p1 = state.particles[particle_type1][i].write().expect("Can't lock particle");
+                for j in 0..number_particles2 {
+                    let mut p2 = state.particles[particle_type2][j].write().expect("Can't lock particle");
+                    let mut r = p2.position - p1.position;
+                    if r.x < -bb.x / 2.0 {
+                        r.x += bb.x;
+                    } else if r.x > bb.x / 2.0 {
+                        r.x -= bb.x;
+                    }
+                    if r.y < -bb.y / 2.0 {
+                        r.y += bb.y;
+                    } else if r.y > bb.y / 2.0 {
+                        r.y -= bb.y;
+                    }
+                    if r.z < -bb.z / 2.0 {
+                        r.z += bb.z;
+                    } else if r.z > bb.z / 2.0 {
+                        r.z -= bb.z;
+                    }
+                    if r.magnitude() > r_cut {
+                        continue;
+                    }
 
-                let radius_vector = p1.position - p2.position;
-                let x = radius_vector.x.abs();
-                let y = radius_vector.y.abs();
-                let z = radius_vector.z.abs();
-                let x = x.min(bb.x - x);
-                let y = y.min(bb.y - y);
-                let z = z.min(bb.z - z);
-                x < r_cut && y < r_cut && z < r_cut
-            };
-            if !near {
-                continue;
-            }
-            let r = state.get_least_r(i, j);
-            let (potential, force) = potential.get_potential_and_force(r.magnitude());
-            let force_vec = r.normalize() * force;
-            let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
-            {
-
-                p1.force += force_vec;
-                p1.potential += potential;
-                p1.temp += t;
-            }
-            {
-
-                p2.force -= force_vec;
-                p2.potential += potential;
-            }
+                    let (potential, force) = potential.get_potential_and_force(r.magnitude());
+                    let force_vec = r.normalize() * force;
+                    let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
+                    {
+                        p1.force += force_vec;
+                        p1.potential += potential;
+                        p1.temp += t;
+                    }
+                    {
+                        p2.force -= force_vec;
+                        p2.potential += potential;
+                    }
+                }
+            });
         }
-    });
+    }
 }
 
 pub fn save_potentials_to_file (path: &PathBuf) {

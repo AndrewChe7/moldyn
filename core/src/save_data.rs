@@ -21,7 +21,7 @@ pub struct ParticleToSave {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StateToSave {
     #[serde(serialize_with = "ordered_map")]
-    pub particles: HashMap<usize, ParticleToSave>,
+    pub particles: HashMap<u16, HashMap<usize, ParticleToSave>>,
     pub boundary_box: Vector3<f64>,
 }
 
@@ -103,16 +103,21 @@ impl ParticleToSave {
 
 impl StateToSave {
     pub fn from(state: &State) -> Self {
-        let mut particles: HashMap<usize, ParticleToSave> = HashMap::new();
+        let mut particles: HashMap<u16, HashMap<usize, ParticleToSave>> = HashMap::new();
         let boundary_box = state.boundary_box.clone();
-        for (i, particle) in state.particles.iter().enumerate() {
-            let particle = particle.read().expect("Can't lock particle");
-            let particle = ParticleToSave {
-                position: particle.position.clone(),
-                velocity: particle.velocity.clone(),
-                id: particle.id.clone(),
-            };
-            particles.insert(i, particle);
+        for (id, particle_type) in state.particles.iter().enumerate() {
+            let id = id as u16;
+            particles.insert(id, HashMap::new());
+
+            for (i, particle) in particle_type.iter().enumerate() {
+                let particle = particle.read().expect("Can't lock particle");
+                let particle = ParticleToSave {
+                    position: particle.position.clone(),
+                    velocity: particle.velocity.clone(),
+                    id: particle.id.clone(),
+                };
+                particles.get_mut(&id).unwrap().insert(i, particle);
+            }
         }
         Self {
             particles,
@@ -121,15 +126,24 @@ impl StateToSave {
     }
 
     pub fn into(&self) -> State {
-        let particle_count = self.particles.len();
+        let particle_type_count = self.particles.len();
         let mut particles = vec![];
-        for _ in 0..particle_count {
-            particles.push(RwLock::new(Particle::default()));
+        for particle_type in 0..particle_type_count {
+            particles.push(vec![]);
+            let particle_type = particle_type as u16;
+            let particles_with_type = self.particles.get(&particle_type)
+                .expect("No particle type");
+            let particles_count = particles_with_type.len();
+            for _ in 0..particles_count {
+                particles[particle_type as usize].push(RwLock::new(Particle::default()));
+            }
         }
         let boundary_box = self.boundary_box.clone();
-        for (i, particle) in self.particles.iter() {
-            let particle: Particle = particle.into().expect("No particle in database");
-            particles[i.clone()] = RwLock::new(particle);
+        for (id, particle_type) in self.particles.iter() {
+            for (i, particle) in particle_type {
+                let particle: Particle = particle.into().expect("No particle in database");
+                particles[*id as usize][*i] = RwLock::new(particle);
+            }
         }
         State {
             particles,

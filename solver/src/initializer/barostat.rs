@@ -14,10 +14,10 @@ pub enum Barostat {
 
 
 impl Barostat {
-    pub fn calculate_myu (&mut self, state: &moldyn_core::State, delta_time: f64, target_pressure: f64) {
-        let particles_count = state.particles.len();
-        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
-        let pressure = get_pressure(&state, 0, particles_count, &mv);
+    pub fn calculate_myu (&mut self, state: &moldyn_core::State, delta_time: f64,
+                          particle_type_id: u16, target_pressure: f64) {
+        let mv = get_center_of_mass_velocity(&state, particle_type_id);
+        let pressure = get_pressure(&state, particle_type_id, &mv);
         match self {
             Barostat::Berendsen {
                 beta, tau, myu
@@ -31,14 +31,15 @@ impl Barostat {
         }
     }
 
-    pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64, _target_pressure: f64) {
+    pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64,
+                  particle_type_id: u16, _target_pressure: f64) {
         match self {
             Barostat::Berendsen {
                 myu, ..
             } => {
                 state.boundary_box *= *myu;
-                for particle in &mut state.particles {
-                    let particle = particle.get_mut().expect("Can't lock particle");
+                for particle in state.particles[particle_type_id as usize].iter_mut() {
+                    let mut particle = particle.write().expect("Can't lock particle");
                     particle.position *= *myu;
                 }
             }

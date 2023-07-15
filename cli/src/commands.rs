@@ -30,15 +30,15 @@ pub fn initialize_uniform(file: &PathBuf,
                                     lattice_cell * size[1] as f64,
                                     lattice_cell * size[2] as f64);
     let mut state = moldyn_solver::initializer::initialize_particles(
-        particles_count, &boundary_box);
+        &[particles_count], &boundary_box);
     let res = moldyn_solver::initializer::initialize_particles_position(&mut state,
-                                                              0, 0,
+                                                              0,
                                                               (0.0, 0.0, 0.0),
                                                               (size[0] as _, size[1] as _, size[2] as _),
                                                                         lattice_cell.clone());
     res.expect("Can't init positions");
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut state,
-                                                              temperature.clone(), particle_mass.clone());
+                                                              temperature.clone(), 0);
     let data = DataFile::init_from_state(&state);
     data.save_to_file(file, pretty_print);
 }
@@ -219,22 +219,22 @@ pub fn solve_macro(in_file: &PathBuf,
         update_force(&mut state);
         let mut parameters = vec![];
         if kinetic_energy {
-            let value = moldyn_solver::macro_parameters::get_kinetic_energy(&state, 0, particle_count);
+            let value = moldyn_solver::macro_parameters::get_kinetic_energy(&state, 0);
             parameters.push(MacroParameterType::KineticEnergy(value));
         }
         if potential_energy {
-            let value = moldyn_solver::macro_parameters::get_potential_energy(&state, 0, particle_count);
+            let value = moldyn_solver::macro_parameters::get_potential_energy(&state, 0);
             parameters.push(MacroParameterType::PotentialEnergy(value));
         }
         let mass_velocity =
         if thermal_energy || temperature || pressure {
-            moldyn_solver::macro_parameters::get_center_of_mass_velocity(&state, 0, particle_count)
+            moldyn_solver::macro_parameters::get_center_of_mass_velocity(&state, 0)
         } else {
             Vector3::zeros()
         };
         let thermal_energy_value =
         if thermal_energy || temperature {
-            let value = moldyn_solver::macro_parameters::get_thermal_energy(&state, 0, particle_count, &mass_velocity);
+            let value = moldyn_solver::macro_parameters::get_thermal_energy(&state, 0, &mass_velocity);
             parameters.push(MacroParameterType::ThermalEnergy(value));
             value
         } else {
@@ -245,7 +245,7 @@ pub fn solve_macro(in_file: &PathBuf,
             parameters.push(MacroParameterType::Temperature(value));
         }
         if pressure {
-            let value = moldyn_solver::macro_parameters::get_pressure(&state, 0, particle_count, &mass_velocity);
+            let value = moldyn_solver::macro_parameters::get_pressure(&state, 0, &mass_velocity);
             parameters.push(MacroParameterType::Pressure(value));
         }
         if custom {

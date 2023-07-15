@@ -10,8 +10,8 @@ fn particle_thermal_energy(particle: &Particle, center_of_mass_velocity: &Vector
     particle.mass * velocity.dot(&velocity) / 2.0
 }
 
-pub fn get_kinetic_energy(state: &State, first_particle: usize, count: usize) -> f64 {
-    let slice = &state.particles[first_particle..(first_particle + count)];
+pub fn get_kinetic_energy(state: &State, particle_type_id: u16) -> f64 {
+    let slice = &state.particles[particle_type_id as usize][..];
     slice
         .iter()
         .map(|particle| {
@@ -23,11 +23,10 @@ pub fn get_kinetic_energy(state: &State, first_particle: usize, count: usize) ->
 
 pub fn get_thermal_energy(
     state: &State,
-    first_particle: usize,
-    count: usize,
+    particle_type_id: u16,
     center_of_mass_velocity: &Vector3<f64>,
 ) -> f64 {
-    let slice = &state.particles[first_particle..(first_particle + count)];
+    let slice = &state.particles[particle_type_id as usize][..];
     slice
         .iter()
         .map(|particle| {
@@ -37,8 +36,8 @@ pub fn get_thermal_energy(
         .sum()
 }
 
-pub fn get_potential_energy(state: &State, first_particle: usize, count: usize) -> f64 {
-    let slice = &state.particles[first_particle..(first_particle + count)];
+pub fn get_potential_energy(state: &State, particle_type_id: u16) -> f64 {
+    let slice = &state.particles[particle_type_id as usize][..];
     let res: f64 = slice
         .iter()
         .map(|particle| {

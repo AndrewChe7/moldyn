@@ -25,7 +25,7 @@ pub struct Particle {
 
 /// Structure that keeps current state
 pub struct State {
-    pub particles: Vec<RwLock<Particle>>,
+    pub particles: Vec<Vec<RwLock<Particle>>>,
     pub boundary_box: Vector3<f64>,
 }
 
@@ -66,11 +66,15 @@ impl Default for Particle {
 impl Clone for State {
     fn clone(&self) -> Self {
         let boundary_box = self.boundary_box.clone();
-        let mut particles: Vec<RwLock<Particle>> = vec![];
-        for particle in &self.particles {
-            let particle = particle.read().expect("Can't lock particle");
-            let particle = particle.clone();
-            particles.push(RwLock::new(particle));
+        let mut particles: Vec<Vec<RwLock<Particle>>> = vec![];
+        for particle_type in &self.particles {
+            let mut pt = vec![];
+            for particle in particle_type {
+                let particle = particle.read().expect("Can't lock particle");
+                let particle = particle.clone();
+                pt.push(RwLock::new(particle));
+            }
+            particles.push(pt);
         }
         Self {
             particles,
@@ -80,38 +84,17 @@ impl Clone for State {
 }
 
 impl State {
-    pub fn get_least_r(&self, i: usize, j: usize) -> Vector3<f64> {
-        let p1 = self.particles[i].read().expect("Can't lock particle");
-        let p2 = self.particles[j].read().expect("Can't lock particle");
-        let bb = &self.boundary_box;
-        let mut res = p2.position - p1.position;
-        if res.x < -bb.x / 2.0 {
-            res.x += bb.x;
-        } else if res.x > bb.x / 2.0 {
-            res.x -= bb.x;
-        }
-        if res.y < -bb.y / 2.0 {
-            res.y += bb.y;
-        } else if res.y > bb.y / 2.0 {
-            res.y -= bb.y;
-        }
-        if res.z < -bb.z / 2.0 {
-            res.z += bb.z;
-        } else if res.z > bb.z / 2.0 {
-            res.z -= bb.z;
-        }
-        res
-    }
-
     pub fn apply_boundary_conditions(&mut self) {
         let bb = &self.boundary_box;
-        let slice = self.particles.as_mut_slice();
-        slice.into_iter().for_each(|particle| {
-            let particle = particle.get_mut().expect("Can't lock particle");
-            particle.position.x = particle.position.x.rem_euclid(bb.x);
-            particle.position.y = particle.position.y.rem_euclid(bb.y);
-            particle.position.z = particle.position.z.rem_euclid(bb.z);
-        });
+        for particle_type in self.particles.iter_mut() {
+            let slice = particle_type.as_mut_slice();
+            slice.into_iter().for_each(|particle| {
+                let particle = particle.get_mut().expect("Can't lock particle");
+                particle.position.x = particle.position.x.rem_euclid(bb.x);
+                particle.position.y = particle.position.y.rem_euclid(bb.y);
+                particle.position.z = particle.position.z.rem_euclid(bb.z);
+            });
+        }
     }
 }
 
@@ -132,7 +115,7 @@ impl Default for State {
                                Vector3::new(0.0, 0.0, 0.0))
             .expect("Can't create particle");
         State {
-            particles: vec![RwLock::new(p1), RwLock::new(p2), RwLock::new(p3)],
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2), RwLock::new(p3)]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         }
     }

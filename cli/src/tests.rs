@@ -35,7 +35,7 @@ fn initialization() {
     assert_eq!(radius, 0.071);
     let state = data.frames.get(&0).expect("Can't get state");
     let state: moldyn_core::State = state.into();
-    assert_eq!(state.particles.len(), 1000);
+    assert_eq!(state.particles[0].len(), 1000);
     assert_eq!(state.boundary_box.x, 33.38339);
     assert_eq!(state.boundary_box.y, 33.38339);
     assert_eq!(state.boundary_box.z, 33.38339);
@@ -61,7 +61,7 @@ fn solvation() {
                                         Vector3::new(-1.0, 1.0, 0.0))
         .expect("Can't create particle");
     let state = moldyn_core::State {
-        particles: vec![RwLock::new(p1), RwLock::new(p2)],
+        particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
     let data = DataFile::init_from_state(&state);
@@ -73,8 +73,8 @@ fn solvation() {
     let data = DataFile::load_from_file(&path2);
     let mut state = data.get_last_frame();
     update_force(&mut state);
-    let p1 = state.particles.get(0).expect("Can't get first particle");
-    let p2 = state.particles.get(1).expect("Can't get second particle");
+    let p1 = &state.particles[0][0];
+    let p2 = &state.particles[0][1];
     let p1 = p1.read().expect("Can't lock particle");
     let p2 = p2.read().expect("Can't lock particle");
     let pos1 = p1.position;

@@ -148,11 +148,11 @@ pub async fn visualizer_window() {
     }
 
     let mut state = State::new(window).await;
-    let mut particles_state = moldyn_solver::initializer::initialize_particles(27000, &(Vector3::new(30.0, 30.0, 30.0) * 3.338339));
+    let mut particles_state = moldyn_solver::initializer::initialize_particles(&[27000], &(Vector3::new(30.0, 30.0, 30.0) * 3.338339));
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-    moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, 0, (0.0, 0.0, 0.0),
+    moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, (0.0, 0.0, 0.0),
                                                               (30, 30, 30), 3.338339).expect("Can't init positions");
-    moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 66.335);
+    moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 0);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
         state.imgui_event(&event);
@@ -421,11 +421,13 @@ impl State {
             }
         );
 
-        let particles_state = moldyn_solver::initializer::initialize_particles(PARTICLE_COUNT, &Vector3::zeros());
+        let particles_state = moldyn_solver::initializer::initialize_particles(&[PARTICLE_COUNT], &Vector3::zeros());
         let mut instances = vec![];
-        for particle in &particles_state.particles {
-            let particle = particle.read().expect("Can't lock particle");
-            instances.push(ParticleDataLite::from(particle.deref()))
+        for particle_type in &particles_state.particles {
+            for particle in particle_type {
+                let particle = particle.read().expect("Can't lock particle");
+                instances.push(ParticleDataLite::from(particle.deref()));
+            }
         }
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
@@ -589,13 +591,18 @@ impl State {
     fn update_particle_state (&mut self, state: &moldyn_core::State) {
         let mut data = vec![];
         let mut center = (0.0, 0.0, 0.0);
-        let particle_count = state.particles.len() as f32;
-        for particle in &state.particles {
-            let particle = particle.read().expect("Can't lock particle");
-            data.push(ParticleDataLite::from(particle.deref()));
-            center.0 += particle.position.x as f32 / particle_count;
-            center.1 += particle.position.y as f32 / particle_count;
-            center.2 += particle.position.z as f32 / particle_count;
+        let particle_count: usize = state.particles.iter().map(|particle_type| {
+            particle_type.len()
+        }).sum();
+        let particle_count = particle_count as f32;
+        for particle_type in &state.particles {
+            for particle in particle_type {
+                let particle = particle.read().expect("Can't lock particle");
+                data.push(ParticleDataLite::from(particle.deref()));
+                center.0 += particle.position.x as f32 / particle_count;
+                center.1 += particle.position.y as f32 / particle_count;
+                center.2 += particle.position.z as f32 / particle_count;
+            }
         }
         self.particles_data = data;
         self.particles_center = center;

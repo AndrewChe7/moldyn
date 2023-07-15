@@ -12,10 +12,11 @@ pub enum Thermostat {
 }
 
 impl Thermostat {
-    pub fn calculate_lambda(&mut self, state: &moldyn_core::State, delta_time: f64, target_temperature: f64) {
-        let particles_count = state.particles.len();
-        let mv = get_center_of_mass_velocity(&state, 0, particles_count);
-        let thermal_energy = get_thermal_energy(&state, 0, particles_count, &mv);
+    pub fn calculate_lambda(&mut self, state: &moldyn_core::State, delta_time: f64,
+                            particle_type_id: u16, target_temperature: f64) {
+        let particles_count = state.particles[particle_type_id as usize].len();
+        let mv = get_center_of_mass_velocity(&state, particle_type_id);
+        let thermal_energy = get_thermal_energy(&state, particle_type_id, &mv);
         let temperature = get_temperature(thermal_energy, particles_count);
         match self {
             Thermostat::Berendsen { tau, lambda } => {
@@ -28,11 +29,12 @@ impl Thermostat {
         }
     }
 
-    pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64, _target_temperature: f64) {
+    pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64,
+                  particle_type_id: u16, _target_temperature: f64) {
         match self {
             Thermostat::Berendsen {lambda, ..} => {
-                for particle in &mut state.particles {
-                    let particle = particle.get_mut().expect("Can't lock particle");
+                for particle in state.particles[particle_type_id as usize].iter_mut() {
+                    let mut particle = particle.write().expect("Can't lock particle");
                     particle.velocity *= *lambda;
                 }
             }

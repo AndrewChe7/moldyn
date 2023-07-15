@@ -2,10 +2,9 @@ use na::Vector3;
 use moldyn_core::State;
 
 pub fn get_pressure(state: &State,
-                    first_particle: usize,
-                    count: usize,
+                    particle_type_id: u16,
                     center_of_mass_velocity: &Vector3<f64>,) -> f64 {
-    let slice = &state.particles[first_particle..(first_particle + count)];
+    let slice = &state.particles[particle_type_id as usize][..];
     let volume = state.boundary_box.x * state.boundary_box.y * state.boundary_box.z;
     let result: f64 = (0..slice.len()).into_iter().map(|i| {
         let mut res = 0.0;

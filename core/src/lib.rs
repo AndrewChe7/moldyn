@@ -48,14 +48,14 @@ mod tests {
     fn state_serialization() {
         let particle = test_particle();
         let state = State {
-            particles: vec![RwLock::new(test_particle()), RwLock::new(test_particle())],
+            particles: vec![vec![RwLock::new(test_particle()), RwLock::new(test_particle())]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let state_data_to_save = StateToSave::from(&state);
         let serialized = serde_json::to_string(&state_data_to_save).unwrap();
         let deserialized: StateToSave = serde_json::from_str(&serialized).unwrap();
         let deserialized: State = (&deserialized).into();
-        for p in &deserialized.particles {
+        for p in &deserialized.particles[0] {
             let ref p = p.read().expect("Can't lock particle");
             check_particle_equality(p, &particle);
         }
@@ -109,7 +109,7 @@ mod tests {
 
     fn check_boundary_conditions(state: &State) -> bool {
         let bb = &state.boundary_box;
-        let slice = state.particles.as_slice();
+        let slice = state.particles[0].as_slice();
         slice.into_iter().all(|particle| {
             let particle = particle.read().expect("Can't lock particle");
             particle.position.x >= 0.0
@@ -129,7 +129,7 @@ mod tests {
         p.position.y = rng.gen();
         p.position.z = 3.0;
         let mut state = State {
-            particles: vec![RwLock::new(p)],
+            particles: vec![vec![RwLock::new(p)]],
             boundary_box: Vector3::new(1.0, 1.0, 1.0),
         };
         assert!(!check_boundary_conditions(&state));
