@@ -1,7 +1,8 @@
+use std::fs;
 use std::path::PathBuf;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
-use moldyn_core::{DataFile, MacroParameterType, ParticleDatabase};
+use moldyn_core::{DataFile, DataFileMacro, MacroParameterType, ParticleDatabase};
 use moldyn_solver::solver::{Integrator, update_force};
 use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, ThermostatChoose};
 
@@ -12,6 +13,13 @@ const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{l
 pub fn backup(data: &mut DataFile, out_file: &PathBuf, iteration: usize) {
     let mut backup_file = out_file.clone();
     backup_file.set_extension(format!("{}.json", iteration));
+    data.save_to_file(&backup_file);
+    data.reset_old();
+}
+
+pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf, iteration: usize) {
+    let mut backup_file = out_file.clone();
+    backup_file.set_extension(format!("{}.macro.json", iteration));
     data.save_to_file(&backup_file);
     data.reset_old();
 }
@@ -172,31 +180,28 @@ pub fn solve_macro(in_file: &PathBuf,
                    pressure: bool,
                    custom: bool,
                    _custom_name: &Option<String>,
-                   range: &Option<Vec<usize>>,
-                   backup_frequency: usize) {
-    let mut data = DataFile::load_from_file(in_file);
-    ParticleDatabase::load(&data.particles_database);
-    let mut start = 0usize;
-    let mut end = data.start_frame + data.frame_count;
-    let mut step = 1usize;
-    range.as_ref().and_then(|r| {
-        if r.len() > 0 {
-            start = r[0];
+                   range: &Option<Vec<usize>>) {
+    let file_dir = in_file.parent().expect("Can't get project folder");
+    let paths = fs::read_dir(file_dir).expect("Can't read directory");
+    let file_path_without_ext = in_file
+        .with_extension("")
+        .with_extension("");
+    let mut sizes: Vec<usize> = vec![];
+    for path in paths {
+        let path = path.expect("Can't get file");
+        let path = path.path();
+        if path.with_extension("").with_extension("") == file_path_without_ext {
+            if let Some(extension) = path.with_extension("").extension() {
+                let extension_string = extension.to_str()
+                    .expect(format!("Can't convert to str {:?}", extension).as_str());
+                if let Ok(last) = extension_string.parse() {
+                    sizes.push(last);
+                }
+            }
         }
-        if r.len() > 1 {
-            end = r[1];
-        }
-        if r.len() > 2 {
-            step = r[2];
-        }
-        Some(0)
-    });
-    if start < data.start_frame {
-        panic!("First frame is {}, but you've passed {}", data.start_frame, start);
     }
-    if end > data.start_frame + data.frame_count {
-        panic!("Last frame is {}, but you've passed {}", data.start_frame + data.frame_count, end);
-    }
+    let start = 0;
+    let end = sizes.iter().max().unwrap();
     let pb = ProgressBar::new((end - start) as u64);
     pb.set_style(
         ProgressStyle::with_template(&PROGRESS_BAR_STYLE)
@@ -204,53 +209,72 @@ pub fn solve_macro(in_file: &PathBuf,
             .progress_chars(PROGRESS_BAR_SYMBOLS)
     );
     pb.set_prefix("Solving macro steps: ");
-    for i in (start..end).step_by(step) {
-        let num_it = (i - start) / step;
-        if num_it > 0 && num_it % backup_frequency == 0 {
-            backup(&mut data, out_file, i);
+    for size in sizes {
+        let file = in_file.with_extension("").with_extension(format!("{}.json", size));
+        let data = DataFile::load_from_file(&file);
+        let mut macro_data = DataFileMacro::new(&data);
+        ParticleDatabase::load(&data.particles_database);
+        let mut start = 0usize;
+        let mut end = data.start_frame + data.frame_count;
+        let mut step = 1usize;
+        range.as_ref().and_then(|r| {
+            if r.len() > 0 {
+                start = r[0];
+            }
+            if r.len() > 1 {
+                end = r[1];
+            }
+            if r.len() > 2 {
+                step = r[2];
+            }
+            Some(0)
+        });
+        start = start.max(data.start_frame);
+        end = end.min(data.start_frame + data.frame_count - 1);
+        for i in (start..=end).step_by(step) {
+            let state = data.frames.get(&i)
+                .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());
+            let mut state: moldyn_core::State = state.into();
+            let particle_count = state.particles.len();
+            update_force(&mut state);
+            let mut parameters = vec![];
+            if kinetic_energy {
+                let value = moldyn_solver::macro_parameters::get_kinetic_energy(&state, 0);
+                parameters.push(MacroParameterType::KineticEnergy(value));
+            }
+            if potential_energy {
+                let value = moldyn_solver::macro_parameters::get_potential_energy(&state, 0);
+                parameters.push(MacroParameterType::PotentialEnergy(value));
+            }
+            let mass_velocity =
+                if thermal_energy || temperature || pressure {
+                    moldyn_solver::macro_parameters::get_center_of_mass_velocity(&state, 0)
+                } else {
+                    Vector3::zeros()
+                };
+            let thermal_energy_value =
+                if thermal_energy || temperature {
+                    let value = moldyn_solver::macro_parameters::get_thermal_energy(&state, 0, &mass_velocity);
+                    parameters.push(MacroParameterType::ThermalEnergy(value));
+                    value
+                } else {
+                    0.0
+                };
+            if temperature {
+                let value = moldyn_solver::macro_parameters::get_temperature(thermal_energy_value, particle_count);
+                parameters.push(MacroParameterType::Temperature(value));
+            }
+            if pressure {
+                let value = moldyn_solver::macro_parameters::get_pressure(&state, 0, &mass_velocity);
+                parameters.push(MacroParameterType::Pressure(value));
+            }
+            if custom {
+                todo!()
+            }
+            macro_data.add_macro_params(i, &parameters, particle_count);
+            pb.inc(step as u64);
         }
-        let state = data.frames.get(&i)
-            .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());
-        let mut state: moldyn_core::State = state.into();
-        let particle_count = state.particles.len();
-        update_force(&mut state);
-        let mut parameters = vec![];
-        if kinetic_energy {
-            let value = moldyn_solver::macro_parameters::get_kinetic_energy(&state, 0);
-            parameters.push(MacroParameterType::KineticEnergy(value));
-        }
-        if potential_energy {
-            let value = moldyn_solver::macro_parameters::get_potential_energy(&state, 0);
-            parameters.push(MacroParameterType::PotentialEnergy(value));
-        }
-        let mass_velocity =
-        if thermal_energy || temperature || pressure {
-            moldyn_solver::macro_parameters::get_center_of_mass_velocity(&state, 0)
-        } else {
-            Vector3::zeros()
-        };
-        let thermal_energy_value =
-        if thermal_energy || temperature {
-            let value = moldyn_solver::macro_parameters::get_thermal_energy(&state, 0, &mass_velocity);
-            parameters.push(MacroParameterType::ThermalEnergy(value));
-            value
-        } else {
-            0.0
-        };
-        if temperature {
-            let value = moldyn_solver::macro_parameters::get_temperature(thermal_energy_value, particle_count);
-            parameters.push(MacroParameterType::Temperature(value));
-        }
-        if pressure {
-            let value = moldyn_solver::macro_parameters::get_pressure(&state, 0, &mass_velocity);
-            parameters.push(MacroParameterType::Pressure(value));
-        }
-        if custom {
-            todo!()
-        }
-        data.add_macro_params(i, &parameters, particle_count);
-        pb.inc(step as u64);
+        backup_macro(&mut macro_data, out_file, end);
     }
-    pb.finish_with_message(format!("Calculated. Macro Parameters saved to {}", out_file.to_string_lossy()));
-    data.save_to_file(out_file);
+    pb.finish();
 }

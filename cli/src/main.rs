@@ -53,12 +53,18 @@ fn main() {
             pressure,
             custom,
             custom_name,
+            all,
             range
         } => {
-            solve_macro(&args.file, out_file, *kinetic_energy, *potential_energy,
-                        *thermal_energy, *temperature, *pressure,
-                        *custom, custom_name, range,
-                        args.backup);
+            if *all {
+                solve_macro(&args.file, out_file, true, true,
+                            true, true, true,
+                            *custom, custom_name, range);
+            } else {
+                solve_macro(&args.file, out_file, *kinetic_energy, *potential_energy,
+                            *thermal_energy, *temperature, *pressure,
+                            *custom, custom_name, range);
+            }
         }
     }
 }

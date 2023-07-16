@@ -1,11 +1,11 @@
+use std::fs;
 use egui::Context;
 use rfd::AsyncFileDialog;
-use moldyn_core::DataFile;
 use crate::visualizer::{UiData, VisualizationParameterType};
 
-pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context, data_file: &mut Option<DataFile>) {
+pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context) {
     egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
-        main_menu(ui, data_file);
+        main_menu(ui, ui_data);
     });
     egui::Window::new("Visualization parameters").show(ctx, |ui| {
         ui.color_edit_button_srgb(&mut ui_data.color_0);
@@ -21,9 +21,9 @@ pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context, data_file: &mut Optio
                 ui.selectable_value(&mut ui_data.visualization_parameter_type,
                                     VisualizationParameterType::Pressure, "Pressure");
         });
-        if let Some(data_file) = data_file {
+        if ui_data.file_path.is_some() {
             ui.add(egui::Slider::new(&mut ui_data.frame_index,
-                 data_file.start_frame..=(data_file.start_frame + data_file.frame_count - 1))
+                                     0..=ui_data.last_frame_from_all)
                 .text("Frame"));
             ui.checkbox(&mut ui_data.play, "Play");
             ui.add(egui::Slider::new(&mut ui_data.play_speed, 1..=100)
@@ -32,9 +32,8 @@ pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context, data_file: &mut Optio
     });
 }
 
-fn main_menu(ui: &mut egui::Ui, data_file: &mut Option<DataFile>) {
+fn main_menu(ui: &mut egui::Ui, ui_data: &mut UiData,) {
     use egui::menu;
-
     menu::bar(ui, |ui| {
         ui.menu_button("File", |ui| {
             if ui.button("Open").clicked() {
@@ -46,7 +45,30 @@ fn main_menu(ui: &mut egui::Ui, data_file: &mut Option<DataFile>) {
                             .pick_file()
                             .await;
                         if let Some(df) = df {
-                            let _ = data_file.insert(DataFile::load_from_file(df.path()));
+                            let in_file = df.path();
+                            let file_dir = in_file.parent().expect("Can't get project folder");
+                            let paths = fs::read_dir(file_dir).expect("Can't read directory");
+                            let file_path_without_ext = in_file
+                                .with_extension("")
+                                .with_extension("");
+                            let mut sizes: Vec<usize> = vec![];
+                            for path in paths {
+                                let path = path.expect("Can't get file");
+                                let path = path.path();
+                                if path.with_extension("").with_extension("") == file_path_without_ext {
+                                    if let Some(extension) = path.with_extension("").extension() {
+                                        let extension_string = extension.to_str()
+                                            .expect(format!("Can't convert to str {:?}", extension).as_str());
+                                        if let Ok(last) = extension_string.parse() {
+                                            sizes.push(last);
+                                        }
+                                    }
+                                }
+                            }
+                            let end = sizes.iter().max().unwrap();
+                            ui_data.last_frame_from_all = end.clone() - 1;
+                            let _ = ui_data.file_path.insert(in_file.to_path_buf());
+                            ui_data.files = sizes;
                         }
                     };
                     pollster::block_on(future);

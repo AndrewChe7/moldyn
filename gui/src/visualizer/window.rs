@@ -1,5 +1,6 @@
 use std::mem;
 use std::ops::Deref;
+use std::path::PathBuf;
 use bytemuck::Pod;
 use bytemuck::Zeroable;
 use cgmath::Matrix4;
@@ -14,7 +15,7 @@ use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
-use moldyn_core::{Particle, ParticleDatabase};
+use moldyn_core::{DataFile, Particle, ParticleDatabase};
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 #[cfg(target_arch = "wasm32")]
@@ -96,6 +97,10 @@ pub struct UiData {
     pub frame_index: usize,
     pub play: bool,
     pub play_speed: usize,
+    pub file_path: Option<PathBuf>,
+    pub loaded_frames: [usize; 2],
+    pub last_frame_from_all: usize,
+    pub files: Vec<usize>,
     pub visualization_parameter_type: VisualizationParameterType,
 }
 
@@ -402,6 +407,10 @@ impl State {
             frame_index: 0,
             play: false,
             play_speed: 1,
+            file_path: None,
+            loaded_frames: [0, 0],
+            last_frame_from_all: 0,
+            files: vec![],
             visualization_parameter_type: VisualizationParameterType::Velocity,
         };
         let visualization_parameter = VisualizationParameter {
@@ -791,16 +800,36 @@ impl State {
         let center = (self.particles_center.0, self.particles_center.1, self.particles_center.2);
         self.camera_controller.update_camera(&mut self.camera, center, self.config.width, self.config.height);
         self.load_camera_to_buffer();
+        let index = self.ui_data.frame_index;
+        if let Some(path) = &self.ui_data.file_path {
+            if self.data_file.is_none() ||
+                index < self.ui_data.loaded_frames[0] ||
+                index > self.ui_data.loaded_frames[1]  {
+                let file = self.ui_data.files.iter()
+                    .filter( |x| **x >= index ).min().unwrap();
+                let load_file = path.with_extension("")
+                    .with_extension(format!("{}.json", file));
+                let _ = self.data_file.insert(DataFile::load_from_file(&load_file));
+                let df = self.data_file.as_ref().unwrap();
+                let start = df.start_frame;
+                let end = df.start_frame + df.frame_count;
+                self.ui_data.loaded_frames[0] = start;
+                self.ui_data.loaded_frames[1] = end;
+            }
+        }
         if let Some(df) = &self.data_file {
-            let state = &df.frames.get(&self.ui_data.frame_index).unwrap().into();
-            let frames_count = df.frame_count;
-            self.update_particle_state(state);
-            self.update_instance_buffer();
-            if self.ui_data.play {
-                self.ui_data.frame_index += self.ui_data.play_speed;
-                if self.ui_data.frame_index >= frames_count {
-                    self.ui_data.frame_index = frames_count - 1;
-                    self.ui_data.play = false;
+            if index >= self.ui_data.loaded_frames[0] &&
+                index <= self.ui_data.loaded_frames[1] {
+                let state = &df.frames.get(&self.ui_data.frame_index).unwrap().into();
+                let frames_count = self.ui_data.last_frame_from_all + 1;
+                self.update_particle_state(state);
+                self.update_instance_buffer();
+                if self.ui_data.play {
+                    self.ui_data.frame_index += self.ui_data.play_speed;
+                    if self.ui_data.frame_index >= frames_count {
+                        self.ui_data.frame_index = frames_count - 1;
+                        self.ui_data.play = false;
+                    }
                 }
             }
         }
@@ -915,7 +944,7 @@ impl State {
             self.platform.begin_frame();
             let ctx = &self.platform.context();
             /////
-            main_window_ui(&mut self.ui_data, ctx, &mut self.data_file);
+            main_window_ui(&mut self.ui_data, ctx);
             use egui_gizmo::Gizmo;
             egui::Area::new("Gizmo Area").show(ctx, |ui| {
                 let camera = &self.camera;
