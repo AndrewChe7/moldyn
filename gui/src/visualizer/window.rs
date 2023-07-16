@@ -15,7 +15,6 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use moldyn_core::{Particle, ParticleDatabase};
-use moldyn_solver::solver::Integrator;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 #[cfg(target_arch = "wasm32")]
@@ -94,6 +93,9 @@ pub struct UiData {
     pub color_1: [u8; 3],
     pub gradient_min: f64,
     pub gradient_max: f64,
+    pub frame_index: usize,
+    pub play: bool,
+    pub play_speed: usize,
     pub visualization_parameter_type: VisualizationParameterType,
 }
 
@@ -130,6 +132,7 @@ struct State {
     platform: Platform,
     egui_rpass: egui_wgpu_backend::RenderPass,
     _egui_demo: egui_demo_lib::DemoWindows,
+    data_file: Option<moldyn_core::DataFile>,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -181,7 +184,6 @@ pub async fn visualizer_window() {
     }
 
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-    let verlet = Integrator::VerletMethod;
     let mut state = State::new(window).await;
     let mut particles_state = moldyn_solver::initializer::initialize_particles(&[125], &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
     moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, (0.0, 0.0, 0.0),
@@ -225,11 +227,9 @@ pub async fn visualizer_window() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-                verlet.calculate(&mut particles_state, 0.002, None, None);
                 let (min_v, max_v) = particles_state.get_min_max_velocity(0);
                 state.ui_data.gradient_min = min_v;
                 state.ui_data.gradient_max = max_v;
-                state.update_particle_state(&particles_state);
                 state.update();
                 match state.render() {
                     Ok(_) => {}
@@ -399,6 +399,9 @@ impl State {
             color_1: [255, 255, 255],
             gradient_min: 0.0,
             gradient_max: 1.0,
+            frame_index: 0,
+            play: false,
+            play_speed: 1,
             visualization_parameter_type: VisualizationParameterType::Velocity,
         };
         let visualization_parameter = VisualizationParameter {
@@ -641,7 +644,10 @@ impl State {
             camera,
             camera_controller,
             particles_data: vec![],
-            particles_center: (0.0, 0.0, 0.0),
+            particles_center: (
+                bb_uniform_data.size[0] / 2.0,
+                bb_uniform_data.size[1] / 2.0,
+                bb_uniform_data.size[2] / 2.0),
             particles_bounding_box: bb_uniform_data,
             ui_data,
             visualization_parameter_buffer,
@@ -664,6 +670,7 @@ impl State {
             platform,
             egui_rpass,
             _egui_demo: egui_demo,
+            data_file: None,
         }
     }
 
@@ -673,18 +680,12 @@ impl State {
 
     fn update_particle_state (&mut self, state: &moldyn_core::State) {
         let mut data = vec![];
-        let mut center = (0.0, 0.0, 0.0);
-        let particle_count: usize = state.particles.iter().map(|particle_type| {
-            particle_type.len()
-        }).sum();
-        let particle_count = particle_count as f32;
+        let bb = state.boundary_box;
+        let center = (bb.x as f32 / 2.0, bb.y as f32 / 2.0, bb.z as f32 / 2.0);
         for particle_type in &state.particles {
             for particle in particle_type {
                 let particle = particle.read().expect("Can't lock particle");
                 data.push(ParticleDataLite::from(particle.deref()));
-                center.0 += particle.position.x as f32 / particle_count;
-                center.1 += particle.position.y as f32 / particle_count;
-                center.2 += particle.position.z as f32 / particle_count;
             }
         }
         self.particles_data = data;
@@ -790,6 +791,19 @@ impl State {
         let center = (self.particles_center.0, self.particles_center.1, self.particles_center.2);
         self.camera_controller.update_camera(&mut self.camera, center, self.config.width, self.config.height);
         self.load_camera_to_buffer();
+        if let Some(df) = &self.data_file {
+            let state = &df.frames.get(&self.ui_data.frame_index).unwrap().into();
+            let frames_count = df.frame_count;
+            self.update_particle_state(state);
+            self.update_instance_buffer();
+            if self.ui_data.play {
+                self.ui_data.frame_index += self.ui_data.play_speed;
+                if self.ui_data.frame_index >= frames_count {
+                    self.ui_data.frame_index = frames_count - 1;
+                    self.ui_data.play = false;
+                }
+            }
+        }
         self.update_visualization_parameter();
     }
 
@@ -901,7 +915,7 @@ impl State {
             self.platform.begin_frame();
             let ctx = &self.platform.context();
             /////
-            main_window_ui(&mut self.ui_data, ctx);
+            main_window_ui(&mut self.ui_data, ctx, &mut self.data_file);
             use egui_gizmo::Gizmo;
             egui::Area::new("Gizmo Area").show(ctx, |ui| {
                 let camera = &self.camera;

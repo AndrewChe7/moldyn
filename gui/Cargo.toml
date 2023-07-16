@@ -17,6 +17,7 @@ crate-type = ["cdylib", "rlib"]
 moldyn_core = { path = "../core" }
 moldyn_solver = { path = "../solver" }
 bytemuck = {version = "1.13.1", features = ["derive"]}
+rfd = "0.11.4"
 nalgebra = "0.32.2"
 cgmath = "0.18.0"
 wgpu = "0.16.1"

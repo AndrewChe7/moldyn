@@ -292,7 +292,7 @@ impl DataFile {
         } else {
             OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
-        let mut buf_writer = BufWriter::new(file);
+        let mut buf_writer = BufWriter::with_capacity(1073741824, file);
         if pretty_print {
             serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
                 .expect("Can't save data to file");
@@ -304,7 +304,7 @@ impl DataFile {
 
     pub fn load_from_file (path: &Path) -> Self {
         let file = File::open(path).expect("Can't open file to read");
-        let buf_reader = BufReader::new(file);
+        let buf_reader = BufReader::with_capacity(1073741824, file);
         let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
         data_file
     }
