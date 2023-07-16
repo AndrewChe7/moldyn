@@ -9,8 +9,6 @@ pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context) {
         ui.color_edit_button_srgb(&mut ui_data.color_0);
         ui.color_edit_button_srgb(&mut ui_data.color_05);
         ui.color_edit_button_srgb(&mut ui_data.color_1);
-        ui.add(egui::Slider::new(&mut ui_data.gradient_min, 0.0..=100.0).text("Min"));
-        ui.add(egui::Slider::new(&mut ui_data.gradient_max, 0.0..=100.0).text("Max"));
         egui::ComboBox::from_label("Parameter")
             .selected_text(format!("{:?}", &ui_data.visualization_parameter_type))
             .show_ui(ui, |ui| {

@@ -96,6 +96,21 @@ impl State {
             });
         }
     }
+
+    pub fn get_min_max_velocity(&self, particle_type_id: u16) -> (f64, f64) {
+        let mut v_squared_max = 0.0;
+        let mut v_squared_min = f64::MAX;
+        self.particles[particle_type_id as usize].iter().for_each(|particle| {
+            let particle = particle.read().expect("Can't lock particle");
+            if particle.velocity.magnitude_squared() > v_squared_max {
+                v_squared_max = particle.velocity.magnitude_squared();
+            }
+            if particle.velocity.magnitude_squared() < v_squared_min {
+                v_squared_min = particle.velocity.magnitude_squared();
+            }
+        });
+        (v_squared_min.sqrt(), v_squared_max.sqrt())
+    }
 }
 
 impl Default for State {

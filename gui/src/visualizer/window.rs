@@ -60,7 +60,8 @@ struct ParticleDataLite {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
     view_pos: [f32; 4],
-    view_proj: [[f32; 4]; 4],
+    view: [[f32; 4]; 4],
+    proj: [[f32; 4]; 4],
 }
 
 #[repr(C, align(16))]
@@ -91,8 +92,8 @@ pub struct UiData {
     pub color_0: [u8; 3],
     pub color_05: [u8; 3],
     pub color_1: [u8; 3],
-    pub gradient_min: f32,
-    pub gradient_max: f32,
+    pub gradient_min: f64,
+    pub gradient_max: f64,
     pub visualization_parameter_type: VisualizationParameterType,
 }
 
@@ -225,6 +226,9 @@ pub async fn visualizer_window() {
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
                 verlet.calculate(&mut particles_state, 0.002, None, None);
+                let (min_v, max_v) = particles_state.get_min_max_velocity(0);
+                state.ui_data.gradient_min = min_v;
+                state.ui_data.gradient_max = max_v;
                 state.update_particle_state(&particles_state);
                 state.update();
                 match state.render() {
@@ -311,10 +315,10 @@ impl CameraUniform {
         let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
         let aspect = camera.width as f32 / camera.height as f32;
         let proj = cgmath::perspective(cgmath::Deg(camera.fovy), aspect, 0.01, 10000.0);
-        let view_proj = proj * view;
         CameraUniform {
             view_pos: [camera.eye.x, camera.eye.y, camera.eye.z, 1.0],
-            view_proj: view_proj.into(),
+            view: view.into(),
+            proj: proj.into(),
         }
     }
 }
@@ -709,8 +713,8 @@ impl State {
                 ui.color_1[2] as f32 / 255.0,
                 1.0],
             gradient_min_max: [
-                ui.gradient_min,
-                ui.gradient_max,
+                ui.gradient_min as f32,
+                ui.gradient_max as f32,
                 0.0, 0.0
             ],
             visualization_parameter_type: [ui.visualization_parameter_type as u32, 0, 0, 0],
