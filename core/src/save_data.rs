@@ -286,20 +286,21 @@ impl DataFile {
         Ok((left, right))
     }
 
-    pub fn save_to_file (&self, path: &Path, pretty_print: bool) {
+    pub fn save_to_file (&self, path: &Path) {
         let file = if !path.exists() {
             File::create(path)
         } else {
             OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
         let mut buf_writer = BufWriter::with_capacity(1073741824, file);
-        if pretty_print {
-            serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
-                .expect("Can't save data to file");
-        } else {
-            serde_json::ser::to_writer(&mut buf_writer, &self)
-                .expect("Can't save data to file");
-        }
+        serde_json::ser::to_writer(&mut buf_writer, &self)
+            .expect("Can't save data to file");
+    }
+
+    pub fn reset_old(&mut self) {
+        self.frames.clear();
+        self.start_frame += self.frame_count;
+        self.frame_count = 0;
     }
 
     pub fn load_from_file (path: &Path) -> Self {

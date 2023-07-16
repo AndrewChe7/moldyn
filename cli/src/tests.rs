@@ -18,7 +18,7 @@ fn initialization() {
     let lattice_cell = 3.338339;
     let temperature = 273.15;
     initialize(&path, &CrystalCellType::Uniform, &vec![10, 10, 10],
-               &particle_name, &mass, &radius, &lattice_cell, &temperature, false);
+               &particle_name, &mass, &radius, &lattice_cell, &temperature);
     let data = DataFile::load_from_file(&path);
     assert_eq!(data.frames.len(), 1);
     assert_eq!(data.start_frame, 0);
@@ -65,9 +65,9 @@ fn solvation() {
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
     let data = DataFile::init_from_state(&state);
-    data.save_to_file(&path, false);
+    data.save_to_file(&path);
     solve(&path, &path2, &IntegratorChoose::VerletMethod,
-          &None, &None, 3, &0.002, false,
+          &None, &None, 3, &0.002,
           100, &None, &None, &None,
           &None, &None, &None);
     let data = DataFile::load_from_file(&path2);

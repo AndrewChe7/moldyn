@@ -9,10 +9,11 @@ use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, ThermostatC
 const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
 const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7} {eta_precise:9} |";
 
-pub fn backup(data: &DataFile, out_file: &PathBuf, iteration: usize) {
+pub fn backup(data: &mut DataFile, out_file: &PathBuf, iteration: usize) {
     let mut backup_file = out_file.clone();
-    backup_file.set_extension(format!("backup.{}.json", iteration));
-    data.save_to_file(&backup_file, false);
+    backup_file.set_extension(format!("{}.json", iteration));
+    data.save_to_file(&backup_file);
+    data.reset_old();
 }
 
 pub fn initialize_uniform(file: &PathBuf,
@@ -21,8 +22,7 @@ pub fn initialize_uniform(file: &PathBuf,
                           particle_mass: &f64,
                           particle_radius: &f64,
                           lattice_cell: &f64,
-                          temperature: &f64,
-                          pretty_print: bool) {
+                          temperature: &f64) {
     ParticleDatabase::add(0, particle_name.as_str(), particle_mass.clone(), particle_radius.clone());
     let particles_count = (size[0] * size[1] * size[2]) as usize;
     let boundary_box = Vector3::new(
@@ -40,7 +40,7 @@ pub fn initialize_uniform(file: &PathBuf,
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut state,
                                                               temperature.clone(), 0);
     let data = DataFile::init_from_state(&state);
-    data.save_to_file(file, pretty_print);
+    data.save_to_file(file);
 }
 
 pub fn initialize(file: &PathBuf,
@@ -50,13 +50,12 @@ pub fn initialize(file: &PathBuf,
                   particle_mass: &f64,
                   particle_radius: &f64,
                   lattice_cell: &f64,
-                  temperature: &f64,
-                  pretty_print: bool) {
+                  temperature: &f64) {
     match crystal_cell_type {
         CrystalCellType::Uniform => {
             initialize_uniform(file, size,
                                particle_name, particle_mass, particle_radius,
-                               lattice_cell, temperature, pretty_print);
+                               lattice_cell, temperature);
         }
     }
 }
@@ -68,7 +67,6 @@ pub fn solve(in_file: &PathBuf,
              potentials_file: &Option<PathBuf>,
              iteration_count: usize,
              delta_time: &f64,
-             pretty_print: bool,
              backup_frequency: usize,
              thermostat_choose: &Option<ThermostatChoose>,
              thermostat_params: &Option<Vec<f64>>,
@@ -145,7 +143,7 @@ pub fn solve(in_file: &PathBuf,
     };
     for i in 0..iteration_count {
         if i > 0 && i % backup_frequency == 0 {
-            backup(&data, out_file, i);
+            backup(&mut data, out_file, i);
         }
         let barostat = if let Some(barostat) = &mut barostat {
             Some((barostat, pressure))
@@ -162,7 +160,7 @@ pub fn solve(in_file: &PathBuf,
         pb.inc(1);
     }
     pb.finish_with_message(format!("Calculated. States saved to {}", out_file.to_string_lossy()));
-    data.save_to_file(out_file, pretty_print);
+    backup(&mut data, out_file, iteration_count);
 }
 
 pub fn solve_macro(in_file: &PathBuf,
@@ -175,7 +173,6 @@ pub fn solve_macro(in_file: &PathBuf,
                    custom: bool,
                    _custom_name: &Option<String>,
                    range: &Option<Vec<usize>>,
-                   pretty_print: bool,
                    backup_frequency: usize) {
     let mut data = DataFile::load_from_file(in_file);
     ParticleDatabase::load(&data.particles_database);
@@ -210,7 +207,7 @@ pub fn solve_macro(in_file: &PathBuf,
     for i in (start..end).step_by(step) {
         let num_it = (i - start) / step;
         if num_it > 0 && num_it % backup_frequency == 0 {
-            backup(&data, out_file, i);
+            backup(&mut data, out_file, i);
         }
         let state = data.frames.get(&i)
             .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());
@@ -255,5 +252,5 @@ pub fn solve_macro(in_file: &PathBuf,
         pb.inc(step as u64);
     }
     pb.finish_with_message(format!("Calculated. Macro Parameters saved to {}", out_file.to_string_lossy()));
-    data.save_to_file(out_file, pretty_print);
+    data.save_to_file(out_file);
 }
