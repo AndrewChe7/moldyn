@@ -88,6 +88,29 @@ struct VisualizationParameter {
     visualization_parameter_type: [u32; 4],
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ChoosePlot {
+    Energy,
+    UnitEnergy,
+    Temperature,
+    Pressure,
+}
+
+pub struct MacroPlots {
+    pub kinetic_energy: Vec<[f64; 2]>,
+    pub potential_energy: Vec<[f64; 2]>,
+    pub thermal_energy: Vec<[f64; 2]>,
+    pub full_energy: Vec<[f64; 2]>,
+    pub internal_energy: Vec<[f64; 2]>,
+    pub unit_kinetic_energy: Vec<[f64; 2]>,
+    pub unit_potential_energy: Vec<[f64; 2]>,
+    pub unit_thermal_energy: Vec<[f64; 2]>,
+    pub unit_full_energy: Vec<[f64; 2]>,
+    pub unit_internal_energy: Vec<[f64; 2]>,
+    pub pressure: Vec<[f64; 2]>,
+    pub temperature: Vec<[f64; 2]>,
+}
+
 pub struct UiData {
     pub color_0: [u8; 3],
     pub color_05: [u8; 3],
@@ -102,6 +125,9 @@ pub struct UiData {
     pub last_frame_from_all: usize,
     pub files: Vec<usize>,
     pub visualization_parameter_type: VisualizationParameterType,
+    pub macro_plots: Option<MacroPlots>,
+    pub show_plot: bool,
+    pub plot_to_draw: ChoosePlot,
 }
 
 struct State {
@@ -137,7 +163,7 @@ struct State {
     platform: Platform,
     egui_rpass: egui_wgpu_backend::RenderPass,
     _egui_demo: egui_demo_lib::DemoWindows,
-    data_file: Option<moldyn_core::DataFile>,
+    data_file: Option<DataFile>,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -254,6 +280,25 @@ pub async fn visualizer_window() {
             _ => {}
         }
     });
+}
+
+impl MacroPlots {
+    pub fn new() -> Self {
+        Self {
+            kinetic_energy: vec![],
+            potential_energy: vec![],
+            thermal_energy: vec![],
+            full_energy: vec![],
+            internal_energy: vec![],
+            unit_kinetic_energy: vec![],
+            unit_potential_energy: vec![],
+            unit_thermal_energy: vec![],
+            unit_full_energy: vec![],
+            unit_internal_energy: vec![],
+            pressure: vec![],
+            temperature: vec![],
+        }
+    }
 }
 
 impl BoundingBox {
@@ -385,7 +430,7 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        let camera = Camera::new((-1.0, 0.0, 0.0), 90.0, (config.width, config.height));
+        let camera = Camera::new((-1.0, 0.0, 0.0), 70.0, (config.width, config.height));
         let camera_controller = CameraController::new(0.2);
         let camera_uniform = CameraUniform::from(&camera);
         let bind_group_layout_entry = wgpu::BindGroupLayoutEntry {
@@ -412,6 +457,9 @@ impl State {
             last_frame_from_all: 0,
             files: vec![],
             visualization_parameter_type: VisualizationParameterType::Velocity,
+            macro_plots: None,
+            show_plot: false,
+            plot_to_draw: ChoosePlot::Energy,
         };
         let visualization_parameter = VisualizationParameter {
             gradient_color_min: [0.0, 0.0, 0.0, 1.0],
@@ -812,7 +860,7 @@ impl State {
                 let _ = self.data_file.insert(DataFile::load_from_file(&load_file));
                 let df = self.data_file.as_ref().unwrap();
                 let start = df.start_frame;
-                let end = df.start_frame + df.frame_count;
+                let end = df.start_frame + df.frame_count - 1;
                 self.ui_data.loaded_frames[0] = start;
                 self.ui_data.loaded_frames[1] = end;
             }
@@ -948,13 +996,14 @@ impl State {
             use egui_gizmo::Gizmo;
             egui::Area::new("Gizmo Area").show(ctx, |ui| {
                 let camera = &self.camera;
-                let view = Matrix4::look_to_rh(camera.eye, camera.forward, camera.up);
-                let aspect = camera.width as f32 / camera.height as f32;
-                let proj = cgmath::perspective(cgmath::Deg(camera.fovy), aspect, 0.01, 10000.0);
+                let camera_uniform = CameraUniform::from(camera);
+                let view = camera_uniform.view;
+                let proj = camera_uniform.proj;
+                let s = self.particles_bounding_box.size.clone();
                 let model = [
-                    [1.0, 0.0, 0.0, 0.0,],
-                    [0.0, 1.0, 0.0, 0.0,],
-                    [0.0, 0.0, 1.0, 0.0,],
+                    [s[0], 0.0, 0.0, 0.0,],
+                    [0.0, s[1], 0.0, 0.0,],
+                    [0.0, 0.0, s[2], 0.0,],
                     [0.0, 0.0, 0.0, 1.0,],
                 ];
                 let gizmo = Gizmo::new("My gizmo")

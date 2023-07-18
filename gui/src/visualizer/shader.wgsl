@@ -92,12 +92,19 @@ fn vs_main(
         case 1u: {
             let gm = vis_param.gradient_min_max.x;
             let gM = vis_param.gradient_min_max.y;
-            let v = (length(instance.velocity) - gm) / (gM - gm);
+            var v = (length(instance.velocity.xyz) - gm) / (gM - gm);
+            if (gM <= gm) {
+                v = 1.0;
+            }
             let m = vis_param.gradient_color_min;
             let x = vis_param.gradient_color_mid;
             let M = vis_param.gradient_color_max;
-            var c = mix(m, M, v);
-            c = mix(x, c, abs(v - 0.5));
+            var c = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+            if (v < 0.5) {
+                c = mix(m, x, v * 2.0);
+            } else {
+                c = mix(x, M, (v - 0.5) * 2.0);
+            }
             out.color = c;
         }
         default: {

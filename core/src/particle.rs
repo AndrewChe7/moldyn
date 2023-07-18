@@ -102,11 +102,12 @@ impl State {
         let mut v_squared_min = f64::MAX;
         self.particles[particle_type_id as usize].iter().for_each(|particle| {
             let particle = particle.read().expect("Can't lock particle");
-            if particle.velocity.magnitude_squared() > v_squared_max {
-                v_squared_max = particle.velocity.magnitude_squared();
+            let velocity_squared = particle.velocity.magnitude_squared();
+            if velocity_squared > v_squared_max {
+                v_squared_max = velocity_squared;
             }
-            if particle.velocity.magnitude_squared() < v_squared_min {
-                v_squared_min = particle.velocity.magnitude_squared();
+            if velocity_squared < v_squared_min {
+                v_squared_min = velocity_squared;
             }
         });
         (v_squared_min.sqrt(), v_squared_max.sqrt())

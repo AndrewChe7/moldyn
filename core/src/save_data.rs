@@ -224,6 +224,11 @@ impl DataFileMacro {
         self.frame_count = 0;
     }
 
+    /// After this function [start_frame] and [frame_count] become incorrect.
+    pub fn append_data(&mut self, another: &DataFileMacro) {
+        self.macro_parameters.extend(another.macro_parameters.clone());
+    }
+
     pub fn load_from_file (path: &Path) -> Self {
         let file = File::open(path).expect("Can't open file to read");
         let buf_reader = BufReader::with_capacity(1073741824, file);

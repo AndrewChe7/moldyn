@@ -235,7 +235,7 @@ pub fn solve_macro(in_file: &PathBuf,
             let state = data.frames.get(&i)
                 .expect(format!("No frame with number {}, is it good??? Have you edited file?", i).as_str());
             let mut state: moldyn_core::State = state.into();
-            let particle_count = state.particles.len();
+            let particle_count = state.particles.iter().map( |t| t.len() ).sum();
             update_force(&mut state);
             let mut parameters = vec![];
             if kinetic_energy {
