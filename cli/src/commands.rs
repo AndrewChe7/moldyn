@@ -17,9 +17,9 @@ pub fn backup(data: &mut DataFile, out_file: &PathBuf, iteration: usize) {
     data.reset_old();
 }
 
-pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf, iteration: usize) {
+pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf) {
     let mut backup_file = out_file.clone();
-    backup_file.set_extension(format!("{}.macro.json", iteration));
+    backup_file.set_extension("macro.csv");
     data.save_to_file(&backup_file);
     data.reset_old();
 }
@@ -209,10 +209,10 @@ pub fn solve_macro(in_file: &PathBuf,
             .progress_chars(PROGRESS_BAR_SYMBOLS)
     );
     pb.set_prefix("Solving macro steps: ");
-    for size in sizes {
+    let mut macro_data = DataFileMacro::new();
+    for size in sizes.iter() {
         let file = in_file.with_extension("").with_extension(format!("{}.json", size));
         let data = DataFile::load_from_file(&file);
-        let mut macro_data = DataFileMacro::new(&data);
         ParticleDatabase::load(&data.particles_database);
         let mut start = 0usize;
         let mut end = data.start_frame + data.frame_count;
@@ -274,7 +274,7 @@ pub fn solve_macro(in_file: &PathBuf,
             macro_data.add_macro_params(i, &parameters, particle_count);
             pb.inc(step as u64);
         }
-        backup_macro(&mut macro_data, out_file, end);
     }
+    backup_macro(&mut macro_data, out_file);
     pb.finish();
 }

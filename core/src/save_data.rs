@@ -3,6 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::RwLock;
+use itertools::Itertools;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
 use crate::{Particle, ParticleDatabase, State};
@@ -36,6 +37,7 @@ pub enum MacroParameterType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MacroParameters {
+    pub iteration: usize,
     pub kinetic_energy: f64,
     pub potential_energy: f64,
     pub thermal_energy: f64,
@@ -44,7 +46,7 @@ pub struct MacroParameters {
     pub unit_thermal_energy: f64,
     pub temperature: f64,
     pub pressure: f64,
-    pub custom: HashMap<usize, f64>,
+    pub custom: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -159,16 +161,17 @@ impl StateToSave {
 }
 
 impl DataFileMacro {
-    pub fn new(data: &DataFile) -> Self {
+    pub fn new() -> Self {
         Self {
             macro_parameters: HashMap::new(),
-            start_frame: data.start_frame,
+            start_frame: 0,
             frame_count: 0,
         }
     }
 
     pub fn add_macro_params(&mut self, frame: usize, parameters: &[MacroParameterType], particles_count: usize) {
-        let mut macro_parameters = self.macro_parameters.entry(frame).or_insert(MacroParameters {
+        let macro_parameters = self.macro_parameters.entry(frame).or_insert(MacroParameters {
+            iteration: frame,
             kinetic_energy: 0.0,
             potential_energy: 0.0,
             thermal_energy: 0.0,
@@ -177,7 +180,7 @@ impl DataFileMacro {
             unit_thermal_energy: 0.0,
             temperature: 0.0,
             pressure: 0.0,
-            custom: HashMap::new(),
+            custom: 0.0,
         });
         for parameter in parameters {
             match parameter {
@@ -213,9 +216,13 @@ impl DataFileMacro {
         } else {
             OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
-        let mut buf_writer = BufWriter::with_capacity(1073741824, file);
-        serde_json::ser::to_writer(&mut buf_writer, &self)
-            .expect("Can't save data to file");
+        let buf_writer = BufWriter::with_capacity(1073741824, file);
+        let mut wtr = csv::Writer::from_writer(buf_writer);
+        for (_key, value) in self.macro_parameters.iter()
+            .sorted_by_key(|x| *x.0) {
+            wtr.serialize(value.clone()).expect("Can't serialize data");
+        }
+        wtr.flush().expect("Can't write");
     }
 
     pub fn reset_old(&mut self) {
@@ -230,10 +237,25 @@ impl DataFileMacro {
     }
 
     pub fn load_from_file (path: &Path) -> Self {
-        let file = File::open(path).expect("Can't open file to read");
-        let buf_reader = BufReader::with_capacity(1073741824, file);
-        let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
-        data_file
+        let mut reader = csv::Reader::from_path(path).expect("Can't open file");
+        let mut macro_parameters = HashMap::new();
+        let mut min_iter = usize::MAX;
+        let mut max_iter = 0;
+        for data in reader.deserialize() {
+            let data: MacroParameters = data.expect("Can't parse row");
+            if data.iteration > max_iter {
+                max_iter = data.iteration;
+            }
+            if data.iteration < min_iter {
+                min_iter = data.iteration;
+            }
+            let _ = macro_parameters.insert(data.iteration, data);
+        }
+        Self {
+            macro_parameters,
+            start_frame: min_iter,
+            frame_count: max_iter - min_iter,
+        }
     }
 }
 
