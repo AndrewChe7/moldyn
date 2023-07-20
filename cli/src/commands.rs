@@ -90,7 +90,13 @@ pub fn solve(in_file: &PathBuf,
         IntegratorChoose::VerletMethod => {
             Integrator::VerletMethod
         }
-        _ => {
+        IntegratorChoose::VerletMethodGpu => {
+            let particles_count: usize = state.particles.iter()
+                .map(|x| { x.len() })
+                .sum();
+            pollster::block_on(Integrator::create_gpu_verlet(particles_count))
+        }
+        IntegratorChoose::Custom => {
             todo!()
         }
     };

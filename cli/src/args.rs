@@ -28,6 +28,8 @@ pub enum CrystalCellType {
 pub enum IntegratorChoose {
     /// https://doi.org/10.1103/PhysRev.159.98
     VerletMethod,
+    /// Same as VerletMethod but uses GPU acceleration
+    VerletMethodGpu,
     /// Custom method
     Custom,
 }
