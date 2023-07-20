@@ -22,7 +22,7 @@ struct VertexInput {
     @location(0) position: vec3<f32>,
 }
 struct InstanceInput {
-    @location(1) position: vec4<f32>,
+    @location(1) instance_position: vec4<f32>,
     @location(2) velocity: vec4<f32>,
     @location(3) mass_radius_id: vec4<f32>,
 }
@@ -75,7 +75,7 @@ fn vs_main(
         s, 0.0, 0.0, 0.0,
         0.0, s, 0.0, 0.0,
         0.0, 0.0, s, 0.0,
-        instance.position.x, instance.position.y, instance.position.z, 1.0
+        instance.instance_position.x, instance.instance_position.y, instance.instance_position.z, 1.0
     );
     var out: VertexOutput;
     var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
