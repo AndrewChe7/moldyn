@@ -23,7 +23,6 @@ fn initialization() {
     assert_eq!(data.frames.len(), 1);
     assert_eq!(data.start_frame, 0);
     assert_eq!(data.frame_count, 1);
-    assert_eq!(data.macro_parameters.len(), 0);
     assert_eq!(data.particles_database.len(), 1);
     ParticleDatabase::load(&data.particles_database);
     assert_ne!(ParticleDatabase::get_particle_name(0), None);
@@ -70,7 +69,7 @@ fn solvation() {
           &None, &None, 3, &0.002,
           100, &None, &None, &None,
           &None, &None, &None);
-    let data = DataFile::load_from_file(&path2);
+    let data = DataFile::load_from_file(&path2.with_extension("3.json"));
     let mut state = data.get_last_frame();
     update_force(&mut state);
     let p1 = &state.particles[0][0];

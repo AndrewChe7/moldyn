@@ -2,6 +2,10 @@ use moldyn_core::{Particle, ParticleDatabase, State};
 use na::Vector3;
 use std::sync::RwLock;
 
+/// Particle creation errors
+/// * particle ID didn't found
+/// * too big
+/// * out of boundary
 #[derive(Eq, PartialEq, Debug)]
 pub enum InitError {
     ParticleIdDidNotFound,
@@ -9,25 +13,41 @@ pub enum InitError {
     OutOfBoundary,
 }
 
-pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>) -> State {
+/// Creates start state with zero position and velocity.
+///
+/// # Arguments
+///
+/// * `number_particles` - slice with amounts of particles. `number_particles[i]` is amount of
+/// particles with id=`i`
+/// * `boundary` - boundary conditions vector
+///
+/// # Returns
+/// State if there is no errors else returns [InitError]
+pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>) -> Result<State, InitError> {
     let mut particles: Vec<Vec<RwLock<Particle>>> = vec![];
     for i in 0..number_particles.len() {
         let mut particle_type = vec![];
+        let particle_type_id = i as u16;
+        if ParticleDatabase::get_particle_mass(particle_type_id).is_none() {
+            return Err(InitError::ParticleIdDidNotFound);
+        }
         for _ in 0..number_particles[i] {
             particle_type.push(RwLock::new(
-                Particle::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0))
-                    .expect("No particle in database")));
+                Particle::new(particle_type_id,
+                              Vector3::new(0.0, 0.0, 0.0),
+                              Vector3::new(0.0, 0.0, 0.0))
+                    .unwrap()));
         }
         particles.push(particle_type);
     }
-    State {
+    Ok(State {
         particles,
         boundary_box: boundary.clone(),
-    }
+    })
 }
 
-/// Initialize particles position on uniform grid of size [grid_size] in [start_position]
-/// with cell size [unit_cell_size] for particle with id [particle_id] in [state].
+/// Initialize particles position on uniform grid of size `grid_size` in `start_position`
+/// with cell size `unit_cell_size` for particle with id `particle_id` in `state`.
 pub fn initialize_particles_position(
     state: &mut State,
     particle_id: u16,

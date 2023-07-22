@@ -8,7 +8,7 @@ use na::{Vector3, Vector4};
 pub use temperature::*;
 pub use pressure::*;
 
-/// Get velocity of center of mass of particles with id [particle_type_id]
+/// Get velocity of center of mass of particles with `particle_type_id`
 pub fn get_center_of_mass_velocity(
     state: &State,
     particle_type_id: u16,
@@ -25,6 +25,7 @@ pub fn get_center_of_mass_velocity(
     Vector3::new(res.x, res.y, res.z) / res.w
 }
 
+/// Get summary momentum of particles with `particle_type_id`
 pub fn get_momentum_of_system (state: &State, particle_type_id: u16) -> Vector3<f64> {
     let mut p = Vector3::new(0.0, 0.0, 0.0);
     for particle in &state.particles[particle_type_id as usize] {

@@ -3,11 +3,14 @@ use crate::initializer::{Barostat, Thermostat};
 use crate::solver::update_force;
 
 pub enum Integrator {
+    /// <https://doi.org/10.1103/PhysRev.159.98>
     VerletMethod,
+    /// Doesn't implemented now
     Custom(String),
 }
 
 impl Integrator {
+    /// Just integrator iteration
     pub fn calculate(&self, state: &mut State, delta_time: f64,
                      mut barostat: Option<(&mut Barostat, f64)>, mut thermostat: Option<(&mut Thermostat, f64)>) {
         match self {

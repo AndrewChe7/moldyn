@@ -24,6 +24,7 @@ pub struct Particle {
 }
 
 /// Structure that keeps current state
+#[derive(Debug)]
 pub struct State {
     /// Particles that exists right now
     pub particles: Vec<Vec<RwLock<Particle>>>,

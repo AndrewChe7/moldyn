@@ -26,25 +26,25 @@ pub enum CrystalCellType {
 
 #[derive(Clone, ValueEnum)]
 pub enum IntegratorChoose {
-    /// https://doi.org/10.1103/PhysRev.159.98
+    /// <https://doi.org/10.1103/PhysRev.159.98>
     VerletMethod,
-    /// Custom method
+    /// Custom method (doesn't implemented yet)
     Custom,
 }
 
 #[derive(Clone, ValueEnum)]
 pub enum BarostatChoose {
-    /// https://pure.rug.nl/ws/files/64380902/1.448118.pdf
+    /// <https://pure.rug.nl/ws/files/64380902/1.448118.pdf>
     Berendsen,
-    /// Custom method
+    /// Custom method (doesn't implemented yet)
     Custom,
 }
 
 #[derive(Clone, ValueEnum)]
 pub enum ThermostatChoose {
-    /// https://pure.rug.nl/ws/files/64380902/1.448118.pdf
+    /// <https://pure.rug.nl/ws/files/64380902/1.448118.pdf>
     Berendsen,
-    /// Custom method
+    /// Custom method (doesn't implemented yet)
     Custom,
 }
 

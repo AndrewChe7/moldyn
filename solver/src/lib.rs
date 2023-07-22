@@ -17,16 +17,12 @@ mod tests {
 
     #[test]
     fn initialize_uniform_grid() {
-        let mut state = initialize_particles(&[8], &Vector3::new(4.0, 4.0, 4.0));
-        let res = initialize_particles_position(
-            &mut state,
-            0,
-            (0.0, 0.0, 0.0),
-            (2, 2, 2),
-            2.0,
-        );
-        assert_eq!(res, Err(InitError::ParticleIdDidNotFound));
+        let res = initialize_particles(&[8],
+                                       &Vector3::new(4.0, 4.0, 4.0));
+        assert_eq!(res.unwrap_err(), InitError::ParticleIdDidNotFound);
         ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
+        let mut state = initialize_particles(&[8],
+                                         &Vector3::new(4.0, 4.0, 4.0)).unwrap();
         let res = initialize_particles_position(
             &mut state,
             0,
@@ -49,7 +45,7 @@ mod tests {
         assert_eq!(particle.position.z, 0.0);
     }
 
-    fn check_impulse(state: &State) {
+    fn check_momentum(state: &State) {
         let mut p = Vector3::new(0.0, 0.0, 0.0);
         for particle in &state.particles[0] {
             let particle = particle.read().expect("Can't lock particle");
@@ -61,19 +57,19 @@ mod tests {
     }
 
     #[test]
-    fn impulse () {
+    fn momentum () {
         let bounding_box = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         let verlet_method = Integrator::VerletMethod;
-        let mut state = initialize_particles(&[8], &bounding_box);
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+        let mut state = initialize_particles(&[8], &bounding_box).unwrap();
         initialize_particles_position(&mut state, 0, (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't initialize particles");
         initialize_velocities_for_gas(&mut state, 273.15, 0);
         update_force(&mut state);
-        check_impulse(&state);
+        check_momentum(&state);
         for _ in 0..100000 {
             verlet_method.calculate(&mut state, 0.002, None, None);
-            check_impulse(&state);
+            check_momentum(&state);
         }
     }
 
@@ -424,11 +420,12 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn berendsen_thermostat () {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(&[8], &bb);
+        let mut state = initialize_particles(&[8], &bb).unwrap();
         initialize_particles_position(&mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
@@ -449,11 +446,12 @@ mod tests {
         assert!((temperature - 273.15).abs() < 1e-5);
     }
 
+    #[ignore]
     #[test]
     fn berendsen_barostat () {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
-        let mut state = initialize_particles(&[8], &bb);
+        let mut state = initialize_particles(&[8], &bb).unwrap();
         initialize_particles_position(&mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");

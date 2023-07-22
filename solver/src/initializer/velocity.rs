@@ -1,6 +1,7 @@
 use moldyn_core::{State, K_B, ParticleDatabase};
 use rand_distr::{Distribution, Normal};
 
+/// Setup velocities according to Maxwell–Boltzmann distribution
 pub fn initialize_velocities_for_gas(state: &mut State, temperature: f64, particle_id: u16) {
     let mut rng = rand::thread_rng();
     let temperature = temperature * 0.01; // Scale temperature from Kelvin to program units

@@ -39,7 +39,7 @@ pub fn initialize_uniform(file: &PathBuf,
                                     lattice_cell * size[1] as f64,
                                     lattice_cell * size[2] as f64);
     let mut state = moldyn_solver::initializer::initialize_particles(
-        &[particles_count], &boundary_box);
+        &[particles_count], &boundary_box).unwrap();
     let res = moldyn_solver::initializer::initialize_particles_position(&mut state,
                                                               0,
                                                               (0.0, 0.0, 0.0),

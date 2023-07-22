@@ -216,9 +216,13 @@ pub async fn visualizer_window() {
 
     ParticleDatabase::add(0, "Argon", 66.335, 0.071);
     let mut state = State::new(window).await;
-    let mut particles_state = moldyn_solver::initializer::initialize_particles(&[125], &(Vector3::new(5.0, 5.0, 5.0) * 3.338339));
-    moldyn_solver::initializer::initialize_particles_position(&mut particles_state, 0, (0.0, 0.0, 0.0),
-                                                              (5, 5, 5), 3.338339).expect("Can't init positions");
+    let mut particles_state =
+        moldyn_solver::initializer::initialize_particles(&[125],
+ &(Vector3::new(5.0, 5.0, 5.0) * 3.338339))
+            .unwrap();
+    moldyn_solver::initializer::initialize_particles_position(
+        &mut particles_state, 0, (0.0, 0.0, 0.0),
+(5, 5, 5), 3.338339).expect("Can't init positions");
     moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 0);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
@@ -561,7 +565,9 @@ impl State {
             }
         );
 
-        let particles_state = moldyn_solver::initializer::initialize_particles(&[PARTICLE_COUNT], &Vector3::zeros());
+        let particles_state =
+            moldyn_solver::initializer::initialize_particles(
+        &[PARTICLE_COUNT], &Vector3::zeros()).unwrap();
         let mut instances = vec![];
         for particle_type in &particles_state.particles {
             for particle in particle_type {

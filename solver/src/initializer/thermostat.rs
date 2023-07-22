@@ -1,10 +1,13 @@
 use crate::macro_parameters::{get_center_of_mass_velocity, get_temperature, get_thermal_energy};
 
+/// Thermostat enum object
 pub enum Thermostat {
+    /// Paper: <https://pure.rug.nl/ws/files/64380902/1.448118.pdf>
     Berendsen {
         tau: f64,
         lambda: f64,
     },
+    /// Doesn't implemented yet
     Custom {
         name: String,
         custom_data: Vec<f64>,
@@ -12,6 +15,7 @@ pub enum Thermostat {
 }
 
 impl Thermostat {
+    /// Calculate velocity scaling coefficient
     pub fn calculate_lambda(&mut self, state: &moldyn_core::State, delta_time: f64,
                             particle_type_id: u16, target_temperature: f64) {
         let particles_count = state.particles[particle_type_id as usize].len();
@@ -29,6 +33,7 @@ impl Thermostat {
         }
     }
 
+    /// Scale velocity
     pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64,
                   particle_type_id: u16, _target_temperature: f64) {
         match self {

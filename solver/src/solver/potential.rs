@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use rand_distr::num_traits::Pow;
 use serde::{Deserialize, Serialize};
 
+/// Enum to keep data for potential calculation
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Potential {
     LennardJones {
@@ -23,6 +24,7 @@ pub enum Potential {
 }
 
 impl Potential {
+    /// Creates Lennard-Jones potential object
     pub fn new_lennard_jones(sigma: f64, eps: f64) -> Potential {
         let r_cut = sigma * 2.5;
         let mut potential = Potential::LennardJones {
@@ -90,6 +92,7 @@ lazy_static! {
     static ref DEFAULT_POTENTIAL: Arc<Potential> = Arc::new(Potential::new_lennard_jones(0.3418, 1.712));
 }
 
+/// Get potential object from potentials database
 pub fn get_potential(id0: u16, id1: u16) -> Arc<Potential> {
     let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
@@ -101,6 +104,7 @@ pub fn get_potential(id0: u16, id1: u16) -> Arc<Potential> {
     }
 }
 
+/// Setup potentials and forces for each particle in `state`
 pub fn update_force(state: &mut State) {
     let particle_type_count = state.particles.len();
     let bb = &state.boundary_box;
@@ -167,6 +171,7 @@ pub fn update_force(state: &mut State) {
     }
 }
 
+/// Save potentials database to file
 pub fn save_potentials_to_file (path: &PathBuf) {
     let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
@@ -184,6 +189,7 @@ pub fn save_potentials_to_file (path: &PathBuf) {
         .expect("Can't save potential settings");
 }
 
+/// Load potentials database to file
 pub fn load_potentials_from_file (path: &PathBuf) {
     let file = File::open(path).expect("Can't open file");
     let buf_reader = BufReader::new(file);

@@ -1,7 +1,16 @@
 [package]
 name = "moldyn_solver"
 version = "0.1.0"
+authors = ["Andrew Chernyakov <Chernjakov2@gmail.com>"]
 edition = "2021"
+description = "Core library for molecular dynamics toolchain"
+repository = "https://github.com/AndrewChe7/moldyn"
+license = "GPL-3.0"
+keywords = ["molecular-dynamics", "physics"]
+categories = [
+    "science",
+    "simulation",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

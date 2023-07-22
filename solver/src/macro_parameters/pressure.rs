@@ -1,6 +1,7 @@
 use na::Vector3;
 use moldyn_core::State;
 
+/// Get pressure of particles with `particle_type_id`
 pub fn get_pressure(state: &State,
                     particle_type_id: u16,
                     center_of_mass_velocity: &Vector3<f64>,) -> f64 {
