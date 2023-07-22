@@ -8,10 +8,14 @@ use std::path::Path;
 use std::string::String;
 use std::sync::RwLock;
 
+/// It keeps particle type data in `ParticleDatabase`.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParticleData {
+    /// Name of a particle
     pub name: String,
+    /// Particle mass in 10^(-27) kg
     pub mass: f64,
+    /// Particle radius in nm
     pub radius: f64,
 }
 
@@ -19,6 +23,11 @@ lazy_static! {
     static ref PARTICLE_DATA: RwLock<HashMap<u16, ParticleData>> = RwLock::new(HashMap::new());
 }
 
+/// Custom read/write file errors
+/// * Can't open
+/// * Can't create
+/// * Can't write
+/// * Can't read
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum SaveLoadError {
@@ -28,9 +37,22 @@ pub enum SaveLoadError {
     CantRead,
 }
 
+/// Empty structure that allows access to particle database from static variable
 pub struct ParticleDatabase;
 
 impl ParticleDatabase {
+    /// Add particle to database.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - ID of particle in particle database.
+    /// * `name` - particle name
+    /// * `mass` - particle mass in 10^(-27) kg
+    /// * `radius` - particle radius in nm
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn add(id: u16, name: &str, mass: f64, radius: f64) {
         let mut particle_data_locked = PARTICLE_DATA.write().expect("Can't lock mutex");
         particle_data_locked.insert(
@@ -43,6 +65,15 @@ impl ParticleDatabase {
         );
     }
 
+    /// Gets mass of particle with `id`
+    ///
+    /// # Returns
+    ///
+    /// Particle mass if it exists in particle database else it returns None
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn get_particle_mass(id: u16) -> Option<f64> {
         let particle_data_locked = PARTICLE_DATA.read().expect("Can't lock mutex");
         if particle_data_locked.contains_key(&id) {
@@ -52,10 +83,20 @@ impl ParticleDatabase {
         }
     }
 
+    /// Returns reference to static object
     pub fn get_data() -> &'static RwLock<HashMap<u16, ParticleData>> {
         &PARTICLE_DATA
     }
 
+    /// Gets radius of particle with `id`
+    ///
+    /// # Returns
+    ///
+    /// Particle radius if it exists in particle database else it returns None
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn get_particle_radius(id: u16) -> Option<f64> {
         let particle_data_locked = PARTICLE_DATA.read().expect("Can't lock mutex");
         if particle_data_locked.contains_key(&id) {
@@ -65,6 +106,15 @@ impl ParticleDatabase {
         }
     }
 
+    /// Gets name of particle with `id`
+    ///
+    /// # Returns
+    ///
+    /// Particle name if it exists in particle database else it returns None
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn get_particle_name(id: u16) -> Option<String> {
         let particle_data_locked = PARTICLE_DATA.read().expect("Can't lock mutex");
         if particle_data_locked.contains_key(&id) {
@@ -74,11 +124,25 @@ impl ParticleDatabase {
         }
     }
 
+    /// Remove all particles from database.
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn clear_particles() {
         let mut particle_data_locked = PARTICLE_DATA.write().expect("Can't lock mutex");
         particle_data_locked.clear();
     }
 
+    /// Serializes particle database to file.
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if there is no error else returns [SaveLoadError]
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn save_particles_data(path: &Path) -> Result<(), SaveLoadError> {
         let file = if !path.exists() {
             File::create(path)
@@ -101,6 +165,15 @@ impl ParticleDatabase {
         Ok(())
     }
 
+    /// Load particle database from file
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if there is no error else returns [SaveLoadError]
+    ///
+    /// # Panics
+    ///
+    /// This function can panic if it can't lock particle database.
     pub fn load_particles_data(path: &Path) -> Result<(), SaveLoadError> {
         let file = File::open(path);
         if file.is_err() {
@@ -124,10 +197,11 @@ impl ParticleDatabase {
         Ok(())
     }
 
+    /// Loads particle database from loaded database
     pub fn load(particle_database: &HashMap<u16, ParticleData>) {
         for (id, particle) in particle_database {
-            ParticleDatabase::add(id.clone(), particle.name.as_str(),
-                                  particle.mass.clone(), particle.radius.clone());
+            ParticleDatabase::add(*id, particle.name.as_str(),
+                                  particle.mass, particle.radius);
         }
     }
 }

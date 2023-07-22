@@ -9,16 +9,15 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::{Particle, ParticleDatabase, State};
 use crate::particles_database::ParticleData;
 
+/// Serialization struct for [Particle]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParticleToSave {
-    /// position of particle in 3d space
     pub position: Vector3<f64>,
-    /// velocity of particle
     pub velocity: Vector3<f64>,
-    /// ID of particle. Defines type of particle
     pub id: u16,
 }
 
+/// Serialization struct for [State]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StateToSave {
     #[serde(serialize_with = "ordered_map")]
@@ -35,6 +34,7 @@ pub enum MacroParameterType {
     Custom(usize, f64),
 }
 
+/// Structure for serialization of macro parameters
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MacroParameters {
     pub iteration: usize,
@@ -49,16 +49,22 @@ pub struct MacroParameters {
     pub custom: f64,
 }
 
+/// Structure to serialize animation data for particles
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DataFile {
+    /// Each frame is state with particles and boundary conditions
     #[serde(serialize_with = "ordered_map")]
     pub frames: HashMap<usize, StateToSave>,
+    /// Particles that was in use in simulation
     #[serde(serialize_with = "ordered_map")]
     pub particles_database: HashMap<u16, ParticleData>,
+    /// First frame in file
     pub start_frame: usize,
+    /// Count of frames in simulation
     pub frame_count: usize,
 }
 
+/// Structure to serialize macro parameters
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DataFileMacro {
     #[serde(serialize_with = "ordered_map")]
@@ -81,9 +87,7 @@ impl ParticleToSave {
     pub fn into(&self) -> Option<Particle> {
         let id = self.id;
         let mass = ParticleDatabase::get_particle_mass(id);
-        if mass.is_none() {
-            return None;
-        }
+        mass?;
         let mass = mass.unwrap();
         let radius = ParticleDatabase::get_particle_radius(id).unwrap();
         Some(
@@ -102,8 +106,8 @@ impl ParticleToSave {
 
     pub fn from(particle: &Particle) -> ParticleToSave {
         ParticleToSave {
-            position: particle.position.clone(),
-            velocity: particle.velocity.clone(),
+            position: particle.position,
+            velocity: particle.velocity,
             id: particle.id,
         }
     }
@@ -112,7 +116,7 @@ impl ParticleToSave {
 impl StateToSave {
     pub fn from(state: &State) -> Self {
         let mut particles: HashMap<u16, HashMap<usize, ParticleToSave>> = HashMap::new();
-        let boundary_box = state.boundary_box.clone();
+        let boundary_box = state.boundary_box;
         for (id, particle_type) in state.particles.iter().enumerate() {
             let id = id as u16;
             particles.insert(id, HashMap::new());
@@ -120,9 +124,9 @@ impl StateToSave {
             for (i, particle) in particle_type.iter().enumerate() {
                 let particle = particle.read().expect("Can't lock particle");
                 let particle = ParticleToSave {
-                    position: particle.position.clone(),
-                    velocity: particle.velocity.clone(),
-                    id: particle.id.clone(),
+                    position: particle.position,
+                    velocity: particle.velocity,
+                    id: particle.id,
                 };
                 particles.get_mut(&id).unwrap().insert(i, particle);
             }
@@ -146,7 +150,7 @@ impl StateToSave {
                 particles[particle_type as usize].push(RwLock::new(Particle::default()));
             }
         }
-        let boundary_box = self.boundary_box.clone();
+        let boundary_box = self.boundary_box;
         for (id, particle_type) in self.particles.iter() {
             for (i, particle) in particle_type {
                 let particle: Particle = particle.into().expect("No particle in database");
@@ -161,6 +165,7 @@ impl StateToSave {
 }
 
 impl DataFileMacro {
+    /// Creates empty structure
     pub fn new() -> Self {
         Self {
             macro_parameters: HashMap::new(),
@@ -169,6 +174,13 @@ impl DataFileMacro {
         }
     }
 
+    /// Add multiple macro parameters
+    ///
+    /// # Arguments
+    /// * `frame` - frame number to add macro parameter
+    /// * `parameters` - slice of [MacroParameterType] each keeps data to save
+    /// * `particles_count` - amount of particles in system
+    ///
     pub fn add_macro_params(&mut self, frame: usize, parameters: &[MacroParameterType], particles_count: usize) {
         let macro_parameters = self.macro_parameters.entry(frame).or_insert(MacroParameters {
             iteration: frame,
@@ -185,22 +197,22 @@ impl DataFileMacro {
         for parameter in parameters {
             match parameter {
                 MacroParameterType::KineticEnergy(value) => {
-                    macro_parameters.kinetic_energy = value.clone();
-                    macro_parameters.unit_kinetic_energy = value.clone() / particles_count as f64;
+                    macro_parameters.kinetic_energy = *value;
+                    macro_parameters.unit_kinetic_energy = *value / particles_count as f64;
                 }
                 MacroParameterType::PotentialEnergy(value) => {
-                    macro_parameters.potential_energy = value.clone();
-                    macro_parameters.unit_potential_energy = value.clone() / particles_count as f64;
+                    macro_parameters.potential_energy = *value;
+                    macro_parameters.unit_potential_energy = *value / particles_count as f64;
                 }
                 MacroParameterType::ThermalEnergy(value) => {
-                    macro_parameters.thermal_energy = value.clone();
-                    macro_parameters.unit_thermal_energy = value.clone() / particles_count as f64;
+                    macro_parameters.thermal_energy = *value;
+                    macro_parameters.unit_thermal_energy = *value / particles_count as f64;
                 }
                 MacroParameterType::Pressure(value) => {
-                    macro_parameters.pressure = value.clone();
+                    macro_parameters.pressure = *value;
                 }
                 MacroParameterType::Temperature(value) => {
-                    macro_parameters.temperature = value.clone();
+                    macro_parameters.temperature = *value;
                 }
                 MacroParameterType::Custom(_id, _value) => {
                     todo!()
@@ -210,6 +222,7 @@ impl DataFileMacro {
         self.frame_count += 1;
     }
 
+    /// Save all macro parameters to file. It uses CSV format.
     pub fn save_to_file (&self, path: &Path) {
         let file = if !path.exists() {
             File::create(path)
@@ -225,17 +238,21 @@ impl DataFileMacro {
         wtr.flush().expect("Can't write");
     }
 
+    /// Removes old frames. This function is used when you want to keep your data in separate files.
     pub fn reset_old(&mut self) {
         self.macro_parameters.clear();
         self.start_frame += self.frame_count;
         self.frame_count = 0;
     }
 
-    /// After this function [start_frame] and [frame_count] become incorrect.
+    /// Extends one macro parameters structure with another.
+    /// > **Warning**
+    /// > After this function `start_frame` and `frame_count` become incorrect.
     pub fn append_data(&mut self, another: &DataFileMacro) {
         self.macro_parameters.extend(another.macro_parameters.clone());
     }
 
+    /// Loads from CSV file macro parameters data.
     pub fn load_from_file (path: &Path) -> Self {
         let mut reader = csv::Reader::from_path(path).expect("Can't open file");
         let mut macro_parameters = HashMap::new();
@@ -259,7 +276,14 @@ impl DataFileMacro {
     }
 }
 
+impl Default for DataFileMacro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataFile {
+    /// Creates new data file structure from existing state
     pub fn init_from_state(state: &State) -> DataFile {
         let particles_database = {
             let particle_database = ParticleDatabase::get_data();
@@ -278,6 +302,7 @@ impl DataFile {
         }
     }
 
+    /// Add new state to data file structure
     pub fn add_state(&mut self, state: &State) {
         let state = StateToSave::from(state);
         let last_frame = self.start_frame + self.frame_count;
@@ -285,56 +310,7 @@ impl DataFile {
         self.frame_count += 1;
     }
 
-    pub fn merge_data_files(a: &DataFile, b: &DataFile) -> Result<DataFile, ()> {
-        if a.start_frame + a.frame_count != b.start_frame {
-            return Err(());
-        }
-        if a.frames.get(&a.start_frame).unwrap().particles.len() !=
-            b.frames.get(&b.start_frame).unwrap().particles.len() {
-            return Err(());
-        }
-        let mut particles_database = a.particles_database.clone();
-        particles_database.extend(b.particles_database.clone());
-        let mut frames = a.frames.clone();
-        frames.extend(b.frames.clone());
-        let result = DataFile {
-            frames,
-            particles_database,
-            start_frame: a.start_frame,
-            frame_count: a.frame_count + b.frame_count,
-        };
-        Ok(result)
-    }
-
-    pub fn split_data_file(data: &DataFile, frame_count_for_first_part: usize) -> Result<(DataFile, DataFile), ()> {
-        if frame_count_for_first_part > data.frame_count {
-            return Err(());
-        }
-        let mut a = HashMap::new();
-        let mut b = HashMap::new();
-        for (i, frame) in &data.frames {
-            let t = *i - data.start_frame;
-            if t < frame_count_for_first_part {
-                a.insert(i.clone(), frame.clone());
-            } else {
-                b.insert(i.clone(), frame.clone());
-            }
-        }
-        let left = DataFile {
-            frames: a,
-            particles_database: data.particles_database.clone(),
-            start_frame: data.start_frame,
-            frame_count: frame_count_for_first_part,
-        };
-        let right = DataFile {
-            frames: b,
-            particles_database: data.particles_database.clone(),
-            start_frame: data.start_frame + frame_count_for_first_part,
-            frame_count: data.frame_count - frame_count_for_first_part,
-        };
-        Ok((left, right))
-    }
-
+    /// Save all data to file
     pub fn save_to_file (&self, path: &Path) {
         let file = if !path.exists() {
             File::create(path)
@@ -346,12 +322,14 @@ impl DataFile {
             .expect("Can't save data to file");
     }
 
+    /// Removes old frames. This function is used when you want to keep your data in separate files.
     pub fn reset_old(&mut self) {
         self.frames.clear();
         self.start_frame += self.frame_count;
         self.frame_count = 0;
     }
 
+    /// Load data file structure from file
     pub fn load_from_file (path: &Path) -> Self {
         let file = File::open(path).expect("Can't open file to read");
         let buf_reader = BufReader::with_capacity(1073741824, file);
@@ -359,6 +337,7 @@ impl DataFile {
         data_file
     }
 
+    /// Get last frame state from data file structure
     pub fn get_last_frame(&self) -> State {
         let last_frame_number = self.start_frame + self.frame_count - 1;
         let last_frame = self.frames.get(&last_frame_number)

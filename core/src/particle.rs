@@ -25,12 +25,43 @@ pub struct Particle {
 
 /// Structure that keeps current state
 pub struct State {
+    /// Particles that exists right now
     pub particles: Vec<Vec<RwLock<Particle>>>,
+    /// Boundary conditions for current state
     pub boundary_box: Vector3<f64>,
 }
 
 impl Particle {
-    /// Create empty particle
+    /// Create new particle of given type in given position with given velocity.
+    ///
+    /// # Arguments
+    ///
+    /// * `particle_id` - ID of particle from particle database.
+    /// * `position` - coordinate of particle in 3D space
+    /// * `velocity` - velocity of particle
+    ///
+    /// # Returns
+    ///
+    /// Particle if `particle_id` in [ParticleDatabase] else returns None
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use nalgebra::Vector3;
+    /// # use moldyn_core::{Particle, ParticleDatabase};
+    /// // Try to create particle that doesn't exist in ParticleDatabase
+    /// let particle = Particle::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+    /// assert!(particle.is_none());
+    /// // Add particle to database and then create it
+    /// ParticleDatabase::add(0, "Argon", 66.335, 0.071);
+    /// let particle = Particle::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
+    /// assert!(particle.is_some());
+    /// let particle = particle.unwrap();
+    /// assert_eq!(particle.mass, 66.335);
+    /// assert_eq!(particle.radius, 0.071);
+    /// assert_eq!(particle.position.x, 0.0);
+    /// assert_eq!(particle.velocity.x, 1.0);
+    /// ```
     pub fn new(particle_id: u16, position: Vector3<f64>, velocity: Vector3<f64>) -> Option<Self> {
         ParticleDatabase::get_particle_mass(particle_id)?;
         let mass = ParticleDatabase::get_particle_mass(particle_id).unwrap();
@@ -49,6 +80,8 @@ impl Particle {
 }
 
 impl Default for Particle {
+    /// Creates default particle for tests. Every parameter is zero, except `mass` and `radius`.
+    /// `Mass` is 1.0 and `radius` is 0.1.
     fn default() -> Self {
         Particle {
             position: Vector3::new(0.0, 0.0, 0.0),
@@ -65,7 +98,7 @@ impl Default for Particle {
 
 impl Clone for State {
     fn clone(&self) -> Self {
-        let boundary_box = self.boundary_box.clone();
+        let boundary_box = self.boundary_box;
         let mut particles: Vec<Vec<RwLock<Particle>>> = vec![];
         for particle_type in &self.particles {
             let mut pt = vec![];
@@ -84,11 +117,11 @@ impl Clone for State {
 }
 
 impl State {
+    /// Makes every particle to satisfy periodic boundary conditions.
     pub fn apply_boundary_conditions(&mut self) {
         let bb = &self.boundary_box;
         for particle_type in self.particles.iter_mut() {
-            let slice = particle_type.as_mut_slice();
-            slice.into_iter().for_each(|particle| {
+            particle_type.iter_mut().for_each(|particle| {
                 let particle = particle.get_mut().expect("Can't lock particle");
                 particle.position.x = particle.position.x.rem_euclid(bb.x);
                 particle.position.y = particle.position.y.rem_euclid(bb.y);
@@ -97,6 +130,9 @@ impl State {
         }
     }
 
+    /// Get minimal and maximum and maximum velocity of particles with type `particle_type_id`.
+    /// > **Warning**
+    /// > This function doesn't check if particle with `particle_type_id` exists!
     pub fn get_min_max_velocity(&self, particle_type_id: u16) -> (f64, f64) {
         let mut v_squared_max = 0.0;
         let mut v_squared_min = f64::MAX;
@@ -115,6 +151,7 @@ impl State {
 }
 
 impl Default for State {
+    /// This default state was created just for testing, you shouldn't use it in real code.
     fn default() -> Self {
         ParticleDatabase::add(0, "test_particle", 1.0, 0.1);
         ParticleDatabase::add(1, "test_particle1", 3.0, 0.3);

@@ -81,8 +81,8 @@ fn vs_main(
     var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
     out.clip_position = camera.proj * camera.view * world_position;
     out.world_position = world_position;
-    out.sphere_center = instance.position;
-    out.radius = distance(world_position.xyz, instance.position.xyz);
+    out.sphere_center = instance.instance_position;
+    out.radius = distance(world_position.xyz, instance.instance_position.xyz);
 
     switch (vis_param.visualization_parameter_type) {
         case 0u: {

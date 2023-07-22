@@ -6,9 +6,8 @@ extern crate lazy_static;
 extern crate nalgebra as na;
 extern crate serde;
 
-pub use particle::Particle;
-pub use particle::State;
-pub use particles_database::ParticleDatabase;
+pub use particle::*;
+pub use particles_database::*;
 pub use save_data::*;
 
 pub const K_B: f64 = 1.380648528;

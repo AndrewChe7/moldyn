@@ -137,7 +137,8 @@ pub enum Commands {
         /// Calculate all macro parameters
         #[arg(short = 'A', long)]
         all: bool,
-        /// Which frames should be processed ([start]:[end]:[step])
+        #[doc()]
+        /// Which frames should be processed (start:end:step)
         #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ':')]
         range: Option<Vec<usize>>,
     },
