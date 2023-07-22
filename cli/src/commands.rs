@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
 use moldyn_core::{DataFile, DataFileMacro, MacroParameterType, ParticleDatabase};
+use moldyn_solver::macro_parameters::get_momentum_of_system;
 use moldyn_solver::solver::{Integrator, update_force};
 use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, ThermostatChoose};
 
@@ -277,4 +278,52 @@ pub fn solve_macro(in_file: &PathBuf,
     }
     backup_macro(&mut macro_data, out_file);
     pb.finish();
+}
+
+pub fn check_impulse (in_file: &PathBuf) {
+    let file_dir = in_file.parent().expect("Can't get project folder");
+    let paths = fs::read_dir(file_dir).expect("Can't read directory");
+    let file_path_without_ext = in_file
+        .with_extension("")
+        .with_extension("");
+    let mut sizes: Vec<usize> = vec![];
+    for path in paths {
+        let path = path.expect("Can't get file");
+        let path = path.path();
+        if path.with_extension("").with_extension("") == file_path_without_ext {
+            if let Some(extension) = path.with_extension("").extension() {
+                let extension_string = extension.to_str()
+                    .expect(format!("Can't convert to str {:?}", extension).as_str());
+                if let Ok(last) = extension_string.parse() {
+                    sizes.push(last);
+                }
+            }
+        }
+    }
+    let first = sizes.iter().min().unwrap().clone();
+    let file = in_file.with_extension("").with_extension(format!("{}.json", first));
+    let data = DataFile::load_from_file(&file);
+    ParticleDatabase::load(&data.particles_database);
+    {
+        println!("First frame");
+        let state = data.frames.get(&0).unwrap().into();
+        for (particle_type, _) in state.particles.iter().enumerate() {
+            let p = get_momentum_of_system(&state, particle_type as u16);
+            let p_abs = p.magnitude();
+            println!("type = {particle_type};|p| = {p_abs:.15};p = {p:.15}");
+        }
+    }
+    let last = sizes.iter().max().unwrap().clone();
+    let file = in_file.with_extension("").with_extension(format!("{}.json", last));
+    let data = DataFile::load_from_file(&file);
+    ParticleDatabase::load(&data.particles_database);
+    {
+        println!("Last frame");
+        let state = data.get_last_frame();
+        for (particle_type, _) in state.particles.iter().enumerate() {
+            let p = get_momentum_of_system(&state, particle_type as u16);
+            let p_abs = p.magnitude();
+            println!("type = {particle_type};|p| = {p_abs:.15};p = {p:.15}");
+        }
+    }
 }

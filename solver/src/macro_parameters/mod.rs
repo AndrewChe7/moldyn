@@ -24,3 +24,12 @@ pub fn get_center_of_mass_velocity(
         .sum();
     Vector3::new(res.x, res.y, res.z) / res.w
 }
+
+pub fn get_momentum_of_system (state: &State, particle_type_id: u16) -> Vector3<f64> {
+    let mut p = Vector3::new(0.0, 0.0, 0.0);
+    for particle in &state.particles[particle_type_id as usize] {
+        let particle = particle.read().expect("Can't lock particle");
+        p += particle.velocity * particle.mass;
+    }
+    return p;
+}

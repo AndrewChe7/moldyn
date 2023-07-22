@@ -1,6 +1,6 @@
 use clap::Parser;
 use crate::args::*;
-use crate::commands::{initialize, solve, solve_macro};
+use crate::commands::{check_impulse, initialize, solve, solve_macro};
 
 mod args;
 mod commands;
@@ -65,6 +65,9 @@ fn main() {
                             *thermal_energy, *temperature, *pressure,
                             *custom, custom_name, range);
             }
+        }
+        Commands::CheckImpulse => {
+            check_impulse(&args.file);
         }
     }
 }

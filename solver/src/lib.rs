@@ -265,6 +265,75 @@ mod tests {
     }
 
     #[test]
+    fn verlet_lj_1000_iterations () {
+        let mut p1 = Particle::default();
+        let mut p2 = Particle::default();
+        p1.position = Vector3::new(0.75, 0.75, 0.5);
+        p2.position = Vector3::new(1.25, 0.75, 0.5);
+        p1.velocity = Vector3::new(1.0, 1.0, 0.0);
+        p2.velocity = Vector3::new(-1.0, 1.0, 0.0);
+        p1.mass = 66.335;
+        p2.mass = 66.335;
+        let mut state = State {
+            particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
+            boundary_box: Vector3::new(2.0, 2.0, 2.0),
+        };
+        let verlet = Integrator::VerletMethod;
+        update_force(&mut state); // Initialize forces
+        for _ in 0..999 {
+            verlet.calculate(&mut state, 0.002, None, None);
+        }
+        {
+            let p1 = state.particles[0][0].read().expect("Can't lock particle");
+            let p2 = state.particles[0][1].read().expect("Can't lock particle");
+            let pos1 = p1.position;
+            let pos2 = p2.position;
+            let v1 = p1.velocity;
+            let v2 = p2.velocity;
+            let f1 = p1.force;
+            let f2 = p2.force;
+            assert_eq!(format!("{:.8}", pos1.x), "0.50617554");
+            assert_eq!(format!("{:.8}", pos1.y), "0.74800000");
+            assert_eq!(format!("{:.8}", pos1.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", pos2.x), "1.49382446");
+            assert_eq!(format!("{:.8}", pos2.y), "0.74800000");
+            assert_eq!(format!("{:.8}", pos2.z), "0.50000000");
+
+            assert_eq!(format!("{:.8}", f1.x), "0.00000000");
+            assert_eq!(format!("{:.8}", f1.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", f2.x), "0.00000000");
+            assert_eq!(format!("{:.8}", f2.y), "0.00000000");
+            assert_eq!(format!("{:.8}", f2.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v1.x), "-0.99547744");
+            assert_eq!(format!("{:.8}", v1.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v1.z), "0.00000000");
+
+            assert_eq!(format!("{:.8}", v2.x), "0.99547744");
+            assert_eq!(format!("{:.8}", v2.y), "1.00000000");
+            assert_eq!(format!("{:.8}", v2.z), "0.00000000");
+        }
+        let mv = get_center_of_mass_velocity(&state, 0);
+        let kinetic = get_kinetic_energy(&state, 0);
+        let thermal = get_thermal_energy(&state, 0, &mv);
+        let potential = get_potential_energy(&state, 0);
+        let internal = thermal + potential;
+        let full = kinetic + potential;
+        let temperature = get_temperature(thermal, 2);
+        let pressure = get_pressure(&state, 0, &mv);
+        assert_eq!(format!("{:.8}", kinetic), "132.07134835");
+        assert_eq!(format!("{:.8}", thermal), "65.73634835");
+        assert_eq!(format!("{:.8}", potential), "0.00000000");
+        assert_eq!(format!("{:.8}", internal), "65.73634835");
+        assert_eq!(format!("{:.8}", full), "132.07134835");
+        assert_eq!(format!("{:.8}", temperature / 100.0), "15.87088652");
+        assert_eq!(format!("{:.8}", pressure), "5.47802903");
+    }
+
+    #[test]
     fn energies() {
         let mut p1 = Particle::default();
         let mut p2 = Particle::default();
