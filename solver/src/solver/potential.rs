@@ -6,6 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 use rand_distr::num_traits::Pow;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Enum to keep data for potential calculation
@@ -124,16 +125,20 @@ pub fn update_force(state: &mut State) {
             let potential = get_potential(particle_type1 as u16, particle_type2 as u16);
             let r_cut = potential.get_radius_cut();
             let number_particles1 = state.particles[particle_type1].len();
-            (0..number_particles1).into_iter().for_each(|i| {
+            (0..number_particles1).into_par_iter().for_each(|i| {
                 let number_particles2 = if particle_type1 == particle_type2 {
                     i
                 } else {
                     state.particles[particle_type2].len()
                 };
-                let mut p1 = state.particles[particle_type1][i].write().expect("Can't lock particle");
                 for j in 0..number_particles2 {
-                    let mut p2 = state.particles[particle_type2][j].write().expect("Can't lock particle");
-                    let mut r = p2.position - p1.position;
+                    let mut r = {
+                        let p1 = state.particles[particle_type1][i]
+                        .read().expect("Can't lock particle");
+                        let p2 = state.particles[particle_type2][j]
+                        .read().expect("Can't lock particle");
+                        p2.position - p1.position
+                    };
                     if r.x < -bb.x / 2.0 {
                         r.x += bb.x;
                     } else if r.x > bb.x / 2.0 {
@@ -157,11 +162,13 @@ pub fn update_force(state: &mut State) {
                     let force_vec = r.normalize() * force;
                     let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
                     {
+                        let mut p1 = state.particles[particle_type1][i].write().expect("Can't lock particle");
                         p1.force += force_vec;
                         p1.potential += potential;
                         p1.temp += t;
                     }
                     {
+                        let mut p2 = state.particles[particle_type2][j].write().expect("Can't lock particle");
                         p2.force -= force_vec;
                         p2.potential += potential;
                     }
