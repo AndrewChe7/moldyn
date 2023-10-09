@@ -17,7 +17,7 @@ fn initialization() {
     let radius = 0.071;
     let lattice_cell = 3.338339;
     let temperature = 273.15;
-    initialize(&path, &CrystalCellType::Uniform, &vec![10, 10, 10],
+    initialize(&path, &CrystalCellType::U, &vec![10, 10, 10],
                &particle_name, &mass, &radius, &lattice_cell, &temperature);
     let data = DataFile::load_from_file(&path);
     assert_eq!(data.frames.len(), 1);

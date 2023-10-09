@@ -13,6 +13,106 @@ pub enum InitError {
     OutOfBoundary,
 }
 
+/// Unit cell types
+pub enum UnitCell {
+    /// Uniform
+    U,
+    /// Face-Centered Cubic
+    FCC,
+}
+
+impl UnitCell {
+    pub fn initialize_particles_position(
+        self,
+        state: &mut State,
+        particle_id: u16,
+        start_position: (f64, f64, f64),
+        grid_size: (usize, usize, usize),
+        unit_cell_size: f64,
+    ) -> Result<(), InitError> {
+        match self {
+            UnitCell::U => {
+                if grid_size.0 * grid_size.1 * grid_size.2 > state.particles[particle_id as usize].len() {
+                    return Err(InitError::TooBig);
+                }
+                for x in 0..grid_size.0 {
+                    for y in 0..grid_size.1 {
+                        for z in 0..grid_size.2 {
+                            let particle = state.particles[particle_id as usize]
+                                [x * grid_size.1 * grid_size.2 + y * grid_size.2 + z]
+                                .get_mut()
+                                .expect("Can't lock particle");
+                            particle.position = Vector3::new(
+                                start_position.0 + x as f64 * unit_cell_size,
+                                start_position.1 + y as f64 * unit_cell_size,
+                                start_position.2 + z as f64 * unit_cell_size,
+                            );
+                        }
+                    }
+                }
+            }
+            UnitCell::FCC => {
+                if grid_size.0 * grid_size.1 * grid_size.2 * 4 > state.particles[particle_id as usize].len() {
+                    return Err(InitError::TooBig);
+                }
+                for x in 0..grid_size.0 {
+                    for y in 0..grid_size.1 {
+                        for z in 0..grid_size.2 {
+                            let cell_id = x * grid_size.1 * grid_size.2 + y * grid_size.2 + z;
+                            {
+                                let particle = state.particles[particle_id as usize]
+                                    [cell_id * 4]
+                                    .get_mut()
+                                    .expect("Can't lock particle");
+                                particle.position = Vector3::new(
+                                    start_position.0 + x as f64 * unit_cell_size,
+                                    start_position.1 + y as f64 * unit_cell_size,
+                                    start_position.2 + z as f64 * unit_cell_size,
+                                );
+                            }
+                            {
+                                let particle = state.particles[particle_id as usize]
+                                    [cell_id * 4 + 1]
+                                    .get_mut()
+                                    .expect("Can't lock particle");
+                                particle.position = Vector3::new(
+                                    start_position.0 + x as f64 * unit_cell_size,
+                                    start_position.1 + (y as f64 + 0.5) * unit_cell_size,
+                                    start_position.2 + (z as f64 + 0.5) * unit_cell_size,
+                                );
+                            }
+                            {
+                                let particle = state.particles[particle_id as usize]
+                                    [cell_id * 4 + 2]
+                                    .get_mut()
+                                    .expect("Can't lock particle");
+                                particle.position = Vector3::new(
+                                    start_position.0 + (x as f64 + 0.5) * unit_cell_size,
+                                    start_position.1 + y as f64 * unit_cell_size,
+                                    start_position.2 + (z as f64 + 0.5) * unit_cell_size,
+                                );
+                            }
+                            {
+                                let particle = state.particles[particle_id as usize]
+                                    [cell_id * 4 + 3]
+                                    .get_mut()
+                                    .expect("Can't lock particle");
+                                particle.position = Vector3::new(
+                                    start_position.0 + (x as f64 + 0.5) * unit_cell_size,
+                                    start_position.1 + (y as f64 + 0.5) * unit_cell_size,
+                                    start_position.2 + z as f64 * unit_cell_size,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Creates start state with zero position and velocity.
 ///
 /// # Arguments
@@ -46,9 +146,10 @@ pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>)
     })
 }
 
-/// Initialize particles position on uniform grid of size `grid_size` in `start_position`
+/// Initialize particles position on  `unit_cell_type`-grid of size `grid_size` in `start_position`
 /// with cell size `unit_cell_size` for particle with id `particle_id` in `state`.
 pub fn initialize_particles_position(
+    unit_cell_type: UnitCell,
     state: &mut State,
     particle_id: u16,
     start_position: (f64, f64, f64),
@@ -58,29 +159,12 @@ pub fn initialize_particles_position(
     if ParticleDatabase::get_particle_mass(particle_id).is_none() {
         return Err(InitError::ParticleIdDidNotFound);
     }
-    if grid_size.0 * grid_size.1 * grid_size.2 > state.particles[particle_id as usize].len() {
-        return Err(InitError::TooBig);
-    }
     if grid_size.0 as f64 * unit_cell_size > state.boundary_box.x
         || grid_size.1 as f64 * unit_cell_size > state.boundary_box.y
         || grid_size.2 as f64 * unit_cell_size > state.boundary_box.z
     {
         return Err(InitError::OutOfBoundary);
     }
-    for x in 0..grid_size.0 {
-        for y in 0..grid_size.1 {
-            for z in 0..grid_size.2 {
-                let particle = state.particles[particle_id as usize]
-                    [x * grid_size.1 * grid_size.2 + y * grid_size.2 + z]
-                    .get_mut()
-                    .expect("Can't lock particle");
-                particle.position = Vector3::new(
-                    start_position.0 + x as f64 * unit_cell_size,
-                    start_position.1 + y as f64 * unit_cell_size,
-                    start_position.2 + z as f64 * unit_cell_size,
-                );
-            }
-        }
-    }
-    Ok(())
+    unit_cell_type.initialize_particles_position(state, particle_id, start_position,
+                                                 grid_size, unit_cell_size)
 }

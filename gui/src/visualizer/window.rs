@@ -16,6 +16,7 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use moldyn_core::{DataFile, Particle, ParticleDatabase};
+use moldyn_solver::initializer::UnitCell;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
 #[cfg(target_arch = "wasm32")]
@@ -220,10 +221,10 @@ pub async fn visualizer_window() {
         moldyn_solver::initializer::initialize_particles(&[125],
  &(Vector3::new(5.0, 5.0, 5.0) * 3.338339))
             .unwrap();
-    moldyn_solver::initializer::initialize_particles_position(
+    moldyn_solver::initializer::initialize_particles_position(UnitCell::U,
         &mut particles_state, 0, (0.0, 0.0, 0.0),
 (5, 5, 5), 3.338339).expect("Can't init positions");
-    moldyn_solver::initializer::initialize_velocities_for_gas(&mut particles_state, 273.0, 0);
+    moldyn_solver::initializer::initialize_velocities_maxwell_boltzmann(&mut particles_state, 273.0, 0);
     state.update_particle_state(&particles_state);
     event_loop.run(move |event, _, control_flow| {
         state.imgui_event(&event);

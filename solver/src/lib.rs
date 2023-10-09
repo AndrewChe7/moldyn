@@ -8,7 +8,7 @@ pub mod solver;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::initializer::{Barostat, InitError, initialize_particles, initialize_particles_position, initialize_velocities_for_gas, Thermostat};
+    use crate::initializer::{Barostat, InitError, initialize_particles, initialize_particles_position, initialize_velocities_maxwell_boltzmann, Thermostat, UnitCell};
     use crate::macro_parameters::{get_center_of_mass_velocity, get_kinetic_energy, get_potential_energy, get_pressure, get_temperature, get_thermal_energy};
     use moldyn_core::{Particle, ParticleDatabase, State};
     use crate::solver::*;
@@ -24,14 +24,16 @@ mod tests {
         let mut state = initialize_particles(&[8],
                                          &Vector3::new(4.0, 4.0, 4.0)).unwrap();
         let res = initialize_particles_position(
+            UnitCell::U,
             &mut state,
             0,
             (0.0, 0.0, 0.0),
             (3, 3, 3),
-            2.0,
+            1.0,
         );
         assert_eq!(res, Err(InitError::TooBig));
         let res = initialize_particles_position(
+            UnitCell::U,
             &mut state,
             0,
             (0.0, 0.0, 0.0),
@@ -62,9 +64,9 @@ mod tests {
         let verlet_method = Integrator::VerletMethod;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         let mut state = initialize_particles(&[8], &bounding_box).unwrap();
-        initialize_particles_position(&mut state, 0, (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
+        initialize_particles_position(UnitCell::U, &mut state, 0, (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't initialize particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 0);
+        initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
         update_force(&mut state);
         check_momentum(&state);
         for _ in 0..100000 {
@@ -426,10 +428,10 @@ mod tests {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         let mut state = initialize_particles(&[8], &bb).unwrap();
-        initialize_particles_position(&mut state, 0,
+        initialize_particles_position(UnitCell::U, &mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 0);
+        initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
         update_force(&mut state);
         let mut berendsen = Thermostat::Berendsen {
             tau: 0.5,
@@ -452,10 +454,10 @@ mod tests {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         let mut state = initialize_particles(&[8], &bb).unwrap();
-        initialize_particles_position(&mut state, 0,
+        initialize_particles_position(UnitCell::U, &mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
-        initialize_velocities_for_gas(&mut state, 273.15, 0);
+        initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
         update_force(&mut state);
         let mut berendsen = Barostat::Berendsen {
             beta: 1.0,

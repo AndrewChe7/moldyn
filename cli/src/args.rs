@@ -21,7 +21,9 @@ pub struct Args {
 #[derive(Clone, ValueEnum)]
 pub enum CrystalCellType {
     /// uniform grid like in gases
-    Uniform,
+    U,
+    /// Face-Centered Cubic grid like in metals.
+    FCC,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -55,22 +57,22 @@ pub enum Commands {
         /// type of crystal cell
         #[arg(short = 't', long, value_enum)]
         crystal_cell_type: CrystalCellType,
-        /// size of this cell
+        /// size of this cell (unit cells count, x y z)
         #[arg(short = 's', long, num_args = 3, value_delimiter = ' ')]
         size: Vec<u32>,
         /// name of particle to initialize
         #[arg(short = 'n', long)]
         particle_name: String,
-        /// mass of particle to initialize
+        /// mass of particle to initialize (10^-27 kg)
         #[arg(short = 'm', long)]
         particle_mass: f64,
-        /// radius of particle to initialize
+        /// radius of particle to initialize (nm)
         #[arg(short = 'r', long)]
         particle_radius: f64,
-        /// lattice cell
+        /// lattice cell (nm)
         #[arg(short = 'l', long)]
         lattice_cell: f64,
-        /// temperature in Kelvin
+        /// temperature (K)
         #[arg(short = 'T', long)]
         temperature: f64,
     },
