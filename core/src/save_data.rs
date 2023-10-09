@@ -6,7 +6,7 @@ use std::sync::RwLock;
 use itertools::Itertools;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
-use crate::{Particle, ParticleDatabase, State};
+use crate::{Particle, ParticleDatabase, State, Structure};
 use crate::particles_database::ParticleData;
 
 /// Serialization struct for [Particle]
@@ -71,6 +71,14 @@ pub struct DataFileMacro {
     pub macro_parameters: HashMap<usize, MacroParameters>,
     pub start_frame: usize,
     pub frame_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DataFileStructure {
+    #[serde(serialize_with = "ordered_map")]
+    pub particles: HashMap<u16, HashMap<usize, ParticleToSave>>,
+    pub origin: [f64; 3],
+    pub particles_database: HashMap<u16, ParticleData>,
 }
 
 fn ordered_map<S, K, V>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
@@ -343,5 +351,78 @@ impl DataFile {
         let last_frame = self.frames.get(&last_frame_number)
             .expect("Can't get frame");
         last_frame.into()
+    }
+}
+
+impl DataFileStructure {
+    fn from(structure: &Structure) -> Self {
+        let particles_database = {
+            let particle_database = ParticleDatabase::get_data();
+            let hash_table = particle_database.read()
+                .expect("Can't lock particles database");
+            hash_table.clone()
+        };
+        let mut particles: HashMap<u16, HashMap<usize, ParticleToSave>> = HashMap::new();
+        for (id, particle_type) in structure.particles.iter().enumerate() {
+            let id = id as u16;
+            particles.insert(id, HashMap::new());
+
+            for (i, particle) in particle_type.iter().enumerate() {
+                let particle = ParticleToSave {
+                    position: particle.position,
+                    velocity: particle.velocity,
+                    id: particle.id,
+                };
+                particles.get_mut(&id).unwrap().insert(i, particle);
+            }
+        }
+        Self {
+            particles,
+            particles_database,
+            origin: structure.origin.into(),
+        }
+    }
+
+    fn into(&self) -> Structure {
+        let particle_type_count = self.particles.len();
+        let mut particles = vec![];
+        for particle_type in 0..particle_type_count {
+            particles.push(vec![]);
+            let particle_type = particle_type as u16;
+            let particles_with_type = self.particles.get(&particle_type)
+                .expect("No particle type");
+            let particles_count = particles_with_type.len();
+            for _ in 0..particles_count {
+                particles[particle_type as usize].push(Particle::default());
+            }
+        }
+        for (id, particle_type) in self.particles.iter() {
+            for (i, particle) in particle_type {
+                let particle: Particle = particle.into().expect("No particle in database");
+                particles[*id as usize][*i] = particle;
+            }
+        }
+        Structure {
+            particles,
+            origin: self.origin.into(),
+        }
+    }
+
+    pub fn save_to_file (&self, path: &Path) {
+        let file = if !path.exists() {
+            File::create(path)
+        } else {
+            OpenOptions::new().truncate(true).write(true).open(path)
+        }.expect("Can't write to file");
+        let mut buf_writer = BufWriter::with_capacity(1073741824, file);
+        serde_json::ser::to_writer(&mut buf_writer, &self)
+            .expect("Can't save data to file");
+    }
+
+    pub fn load_from_file (path: &Path) -> Self {
+        let file = File::open(path).expect("Can't open file to read");
+        let buf_reader = BufReader::with_capacity(1073741824, file);
+        let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
+        data_file
     }
 }

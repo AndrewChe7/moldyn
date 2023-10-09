@@ -1,6 +1,6 @@
 [package]
 name = "moldyn_solver"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Andrew Chernyakov <Chernjakov2@gmail.com>"]
 edition = "2021"
 description = "Core library for molecular dynamics toolchain"
