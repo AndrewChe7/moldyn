@@ -5,17 +5,17 @@ use nalgebra::Vector3;
 use moldyn_core::{DataFile, DataFileMacro, MacroParameterType, ParticleDatabase};
 use moldyn_solver::initializer::UnitCell;
 use moldyn_solver::macro_parameters::get_momentum_of_system;
-use moldyn_solver::solver::{Integrator, update_force};
-use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, ThermostatChoose};
+use moldyn_solver::solver::{Integrator, load_potentials_from_file, Potential, save_potentials_to_file, set_potential, update_force};
+use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, PotentialChoose, ThermostatChoose};
 
 
 const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
 const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7} {eta_precise:9} |";
 
-pub fn backup(data: &mut DataFile, out_file: &PathBuf, iteration: usize) {
+pub fn backup(data: &mut DataFile, out_file: &PathBuf, iteration: usize, pretty_print: bool) {
     let mut backup_file = out_file.clone();
     backup_file.set_extension(format!("{}.json", iteration));
-    data.save_to_file(&backup_file);
+    data.save_to_file(&backup_file, pretty_print);
     data.reset_old();
 }
 
@@ -26,6 +26,25 @@ pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf) {
     data.reset_old();
 }
 
+pub fn generate_default_potentials(file: &PathBuf) {
+    set_potential(0, 0, Potential::new_lennard_jones(0.3418, 1.712));
+    save_potentials_to_file(file);
+}
+
+pub fn add_potential_to_file(file: &PathBuf, particles: &Vec<u16>, potential: &PotentialChoose, params: &Vec<f64>) {
+    load_potentials_from_file(file);
+    let potential = match potential {
+        PotentialChoose::LennardJones => {
+            Potential::new_lennard_jones(params[0], params[1])
+        }
+        PotentialChoose::Custom => {
+            todo!()
+        }
+    };
+    set_potential(particles[0], particles[1], potential);
+    save_potentials_to_file(file);
+}
+
 pub fn initialize(file: &PathBuf,
                   crystal_cell_type: &CrystalCellType,
                   size: &Vec<u32>,
@@ -33,7 +52,8 @@ pub fn initialize(file: &PathBuf,
                   particle_mass: &f64,
                   particle_radius: &f64,
                   lattice_cell: &f64,
-                  temperature: &f64) {
+                  temperature: &f64,
+                  pretty_print: bool) {
     let unit_cell_type = match crystal_cell_type {
         CrystalCellType::U => UnitCell::U,
         CrystalCellType::FCC => UnitCell::FCC,
@@ -61,7 +81,7 @@ pub fn initialize(file: &PathBuf,
     moldyn_solver::initializer::initialize_velocities_maxwell_boltzmann(&mut state,
                                                               temperature.clone(), 0);
     let data = DataFile::init_from_state(&state);
-    data.save_to_file(file);
+    data.save_to_file(file, pretty_print);
 }
 
 pub fn solve(in_file: &PathBuf,
@@ -77,10 +97,14 @@ pub fn solve(in_file: &PathBuf,
              temperature: &Option<f64>,
              barostat_choose: &Option<BarostatChoose>,
              barostat_params: &Option<Vec<f64>>,
-             pressure: &Option<f64>) {
+             pressure: &Option<f64>,
+             pretty_print: bool) {
     let mut data = DataFile::load_from_file(in_file);
     ParticleDatabase::load(&data.particles_database);
-    let mut state = data.get_last_frame();
+    let (last_frame, mut state) = data.get_last_frame();
+    if let Some(potentials_file) = potentials_file {
+        load_potentials_from_file(potentials_file);
+    }
     update_force(&mut state);
     let integrator = match integrator {
         IntegratorChoose::VerletMethod => {
@@ -125,9 +149,6 @@ pub fn solve(in_file: &PathBuf,
     } else {
         None
     };
-    if let Some(potentials_file) = potentials_file {
-        moldyn_solver::solver::load_potentials_from_file(potentials_file);
-    }
     let pb = ProgressBar::new(iteration_count as u64);
     pb.set_style(
         ProgressStyle::with_template(&PROGRESS_BAR_STYLE)
@@ -145,9 +166,9 @@ pub fn solve(in_file: &PathBuf,
     } else {
         0.0
     };
-    for i in 0..iteration_count {
-        if i > 0 && i % backup_frequency == 0 {
-            backup(&mut data, out_file, i);
+    for i in last_frame..last_frame + iteration_count {
+        if i > 0 && (i - last_frame) % backup_frequency == 0 {
+            backup(&mut data, out_file, i, pretty_print);
         }
         let barostat = if let Some(barostat) = &mut barostat {
             Some((barostat, pressure))
@@ -164,7 +185,7 @@ pub fn solve(in_file: &PathBuf,
         pb.inc(1);
     }
     pb.finish_with_message(format!("Calculated. States saved to {}", out_file.to_string_lossy()));
-    backup(&mut data, out_file, iteration_count);
+    backup(&mut data, out_file, last_frame + iteration_count, pretty_print);
 }
 
 pub fn solve_macro(in_file: &PathBuf,
@@ -314,7 +335,7 @@ pub fn check_impulse (in_file: &PathBuf) {
     ParticleDatabase::load(&data.particles_database);
     {
         println!("Last frame");
-        let state = data.get_last_frame();
+        let (_, state) = data.get_last_frame();
         for (particle_type, _) in state.particles.iter().enumerate() {
             let p = get_momentum_of_system(&state, particle_type as u16);
             let p_abs = p.magnitude();

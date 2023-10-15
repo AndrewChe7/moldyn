@@ -1,6 +1,6 @@
 use clap::Parser;
 use crate::args::*;
-use crate::commands::{check_impulse, initialize, solve, solve_macro};
+use crate::commands::{add_potential_to_file, check_impulse, generate_default_potentials, initialize, solve, solve_macro};
 
 mod args;
 mod commands;
@@ -22,7 +22,7 @@ fn main() {
             temperature
         } => {
             initialize(&args.file, crystal_cell_type, size, particle_name,
-                       particle_mass, particle_radius, lattice_cell, temperature);
+                       particle_mass, particle_radius, lattice_cell, temperature, args.pretty_print);
         }
         Commands::Solve {
             out_file,
@@ -42,7 +42,7 @@ fn main() {
                   custom_method, potentials_file, *iteration_count,
                   delta_time, args.backup,
                   thermostat, thermostat_params, temperature,
-                  barostat, barostat_params, pressure);
+                  barostat, barostat_params, pressure, args.pretty_print);
         }
         Commands::SolveMacroParameters {
             out_file,
@@ -68,6 +68,16 @@ fn main() {
         }
         Commands::CheckImpulse => {
             check_impulse(&args.file);
+        }
+        Commands::GenerateDefaultPotentials => {
+            generate_default_potentials(&args.file);
+        }
+        Commands::SetPotential {
+            particle_types,
+            potential,
+            params,
+        } => {
+            add_potential_to_file(&args.file, particle_types, potential, params);
         }
     }
 }

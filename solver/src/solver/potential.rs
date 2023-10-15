@@ -182,9 +182,9 @@ pub fn update_force(state: &mut State) {
 pub fn save_potentials_to_file (path: &PathBuf) {
     let db = POTENTIALS_DATA.read()
         .expect("Can't lock potentials database");
-    let mut new_db: HashMap<(u16, u16), Potential> = HashMap::new();
+    let mut new_db: HashMap<String, Potential> = HashMap::new();
     for (k, v) in db.iter() {
-        new_db.insert(k.clone(), v.as_ref().clone()).unwrap();
+        let _ = new_db.insert(format!("{},{}", k.0, k.1), v.as_ref().clone());
     }
     let file = if path.exists() {
         OpenOptions::new().truncate(true).write(true).open(path).expect("Can't open file")
@@ -200,11 +200,22 @@ pub fn save_potentials_to_file (path: &PathBuf) {
 pub fn load_potentials_from_file (path: &PathBuf) {
     let file = File::open(path).expect("Can't open file");
     let buf_reader = BufReader::new(file);
-    let data: HashMap<(u16, u16), Potential> = serde_json::de::from_reader(buf_reader)
+    let data: HashMap<String, Potential> = serde_json::de::from_reader(buf_reader)
         .expect("Can't load data from file");
     let mut db = POTENTIALS_DATA.write()
         .expect("Can't lock potentials database");
     for (id, potential) in data {
-        db.insert(id, Arc::new(potential));
+        let key: Vec<u16> = id.split(",").map(|x|
+            x.parse::<u16>()
+            .expect(format!("Can't convert {} to i16", x).as_str()))
+            .collect();
+        db.insert((key[0], key[1]), Arc::new(potential));
     }
+}
+
+pub fn set_potential (id0: u16, id1: u16, potential: Potential) {
+    let mut db = POTENTIALS_DATA.write()
+        .expect("Can't lock potentials database");
+    let key = if id0 > id1 { (id1, id0) } else { (id0, id1) };
+    db.insert(key, Arc::new(potential));
 }

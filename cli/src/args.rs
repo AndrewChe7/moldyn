@@ -14,6 +14,9 @@ pub struct Args {
     /// how often to make backup
     #[arg(short, long, default_value_t=2000)]
     pub backup: usize,
+    /// how often to save state
+    #[arg(long, default_value_t=1)]
+    pub frames_per_save: usize,
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -50,8 +53,25 @@ pub enum ThermostatChoose {
     Custom,
 }
 
+#[derive(Clone, ValueEnum)]
+pub enum PotentialChoose {
+    LennardJones,
+    Custom,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Generate file with default potentials
+    GenerateDefaultPotentials,
+    /// Sets potential between different particle types
+    SetPotential {
+        #[arg(short = 'i', long, num_args = 2, value_delimiter = ' ')]
+        particle_types: Vec<u16>,
+        #[arg(short = 'p', long, value_enum)]
+        potential: PotentialChoose,
+        #[arg(long, num_args = 1.., value_delimiter = ' ')]
+        params: Vec<f64>,
+    },
     /// initialize particles state
     Initialize {
         /// type of crystal cell

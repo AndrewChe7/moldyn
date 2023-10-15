@@ -319,15 +319,20 @@ impl DataFile {
     }
 
     /// Save all data to file
-    pub fn save_to_file (&self, path: &Path) {
+    pub fn save_to_file (&self, path: &Path, pretty_print: bool) {
         let file = if !path.exists() {
             File::create(path)
         } else {
             OpenOptions::new().truncate(true).write(true).open(path)
         }.expect("Can't write to file");
         let mut buf_writer = BufWriter::with_capacity(1073741824, file);
-        serde_json::ser::to_writer(&mut buf_writer, &self)
-            .expect("Can't save data to file");
+        if pretty_print {
+            serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
+                .expect("Can't save data to file");
+        } else {
+            serde_json::ser::to_writer(&mut buf_writer, &self)
+                .expect("Can't save data to file");
+        }
     }
 
     /// Removes old frames. This function is used when you want to keep your data in separate files.
@@ -346,11 +351,11 @@ impl DataFile {
     }
 
     /// Get last frame state from data file structure
-    pub fn get_last_frame(&self) -> State {
+    pub fn get_last_frame(&self) -> (usize, State) {
         let last_frame_number = self.start_frame + self.frame_count - 1;
         let last_frame = self.frames.get(&last_frame_number)
             .expect("Can't get frame");
-        last_frame.into()
+        (last_frame_number, last_frame.into())
     }
 }
 

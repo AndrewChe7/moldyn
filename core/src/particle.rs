@@ -1,6 +1,6 @@
 use std::ops::Range;
 use crate::ParticleDatabase;
-use na::{DimRange, Rotation3, Scale3, Vector3};
+use na::{Rotation3, Scale3, Vector3};
 use std::sync::RwLock;
 
 /// Structure that keeps all data for particle
