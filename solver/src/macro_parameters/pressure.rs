@@ -7,15 +7,14 @@ pub fn get_pressure(state: &State,
                     center_of_mass_velocity: &Vector3<f64>,) -> f64 {
     let slice = &state.particles[particle_type_id as usize][..];
     let volume = state.boundary_box.x * state.boundary_box.y * state.boundary_box.z;
-    let result: f64 = (0..slice.len()).into_iter().map(|i| {
-        let mut res = 0.0;
-        let particle = &slice[i];
+    let mut result1 = 0.0;
+    let mut result2 = 0.0;
+    for particle in slice {
         let dv = particle.velocity - center_of_mass_velocity;
-        res += particle.mass * dv.x * dv.x;
-        res += particle.mass * dv.y * dv.y;
-        res += particle.mass * dv.z * dv.z;
-        res -= particle.temp;
-        res
-    }).sum();
-    result / volume / 3.0
+        result1 += particle.mass * dv.x * dv.x;
+        result1 += particle.mass * dv.y * dv.y;
+        result1 += particle.mass * dv.z * dv.z;
+        result2 -= particle.temp;
+    }
+    (result1 + result2 * 0.5) / volume / 3.0
 }
