@@ -111,7 +111,6 @@ pub fn update_force(state: &mut State) {
     let bb = &state.boundary_box;
     state.particles.iter_mut().for_each(|particle_type| {
         particle_type.iter_mut().for_each(|particle| {
-            let particle = particle.get_mut().expect("Can't lock particle");
             particle.force.x = 0.0;
             particle.force.y = 0.0;
             particle.force.z = 0.0;
@@ -124,19 +123,16 @@ pub fn update_force(state: &mut State) {
         for particle_type2 in particle_type1..particle_type_count {
             let potential = get_potential(particle_type1 as u16, particle_type2 as u16);
             let r_cut = potential.get_radius_cut();
-            let number_particles1 = state.particles[particle_type1].len();
-            (0..number_particles1).into_par_iter().for_each(|i| {
-                let number_particles2 = if particle_type1 == particle_type2 {
-                    i
-                } else {
-                    state.particles[particle_type2].len()
-                };
-                for j in 0..number_particles2 {
+            let old_particles = state.particles.clone();
+            let slice = &mut state.particles[particle_type1][..];
+            slice.par_iter_mut().enumerate().for_each(|(i, particle)| {
+                for j in 0..old_particles[particle_type2].len() {
+                    if particle_type1 == particle_type2 && i == j {
+                        continue;
+                    }
                     let mut r = {
-                        let p1 = state.particles[particle_type1][i]
-                        .read().expect("Can't lock particle");
-                        let p2 = state.particles[particle_type2][j]
-                        .read().expect("Can't lock particle");
+                        let p1 = &old_particles[particle_type1][i];
+                        let p2 = &old_particles[particle_type2][j];
                         p2.position - p1.position
                     };
                     if r.x < -bb.x / 2.0 {
@@ -161,17 +157,9 @@ pub fn update_force(state: &mut State) {
                     let (potential, force) = potential.get_potential_and_force(r.magnitude());
                     let force_vec = r.normalize() * force;
                     let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
-                    {
-                        let mut p1 = state.particles[particle_type1][i].write().expect("Can't lock particle");
-                        p1.force += force_vec;
-                        p1.potential += potential;
-                        p1.temp += t;
-                    }
-                    {
-                        let mut p2 = state.particles[particle_type2][j].write().expect("Can't lock particle");
-                        p2.force -= force_vec;
-                        p2.potential += potential;
-                    }
+                    particle.force += force_vec;
+                    particle.potential += potential;
+                    particle.temp += t;
                 }
             });
         }

@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
-use std::sync::RwLock;
 use itertools::Itertools;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
@@ -130,7 +129,6 @@ impl StateToSave {
             particles.insert(id, HashMap::new());
 
             for (i, particle) in particle_type.iter().enumerate() {
-                let particle = particle.read().expect("Can't lock particle");
                 let particle = ParticleToSave {
                     position: particle.position,
                     velocity: particle.velocity,
@@ -155,14 +153,14 @@ impl StateToSave {
                 .expect("No particle type");
             let particles_count = particles_with_type.len();
             for _ in 0..particles_count {
-                particles[particle_type as usize].push(RwLock::new(Particle::default()));
+                particles[particle_type as usize].push(Particle::default());
             }
         }
         let boundary_box = self.boundary_box;
         for (id, particle_type) in self.particles.iter() {
             for (i, particle) in particle_type {
                 let particle: Particle = particle.into().expect("No particle in database");
-                particles[*id as usize][*i] = RwLock::new(particle);
+                particles[*id as usize][*i] = particle;
             }
         }
         State {

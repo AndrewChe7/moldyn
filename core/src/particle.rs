@@ -1,7 +1,6 @@
 use std::ops::Range;
 use crate::ParticleDatabase;
 use na::{Rotation3, Scale3, Vector3};
-use std::sync::RwLock;
 
 /// Structure that keeps all data for particle
 #[derive(Clone, Debug)]
@@ -28,7 +27,7 @@ pub struct Particle {
 #[derive(Debug)]
 pub struct State {
     /// Particles that exists right now
-    pub particles: Vec<Vec<RwLock<Particle>>>,
+    pub particles: Vec<Vec<Particle>>,
     /// Boundary conditions for current state
     pub boundary_box: Vector3<f64>,
 }
@@ -109,13 +108,12 @@ impl Default for Particle {
 impl Clone for State {
     fn clone(&self) -> Self {
         let boundary_box = self.boundary_box;
-        let mut particles: Vec<Vec<RwLock<Particle>>> = vec![];
+        let mut particles: Vec<Vec<Particle>> = vec![];
         for particle_type in &self.particles {
             let mut pt = vec![];
             for particle in particle_type {
-                let particle = particle.read().expect("Can't lock particle");
                 let particle = particle.clone();
-                pt.push(RwLock::new(particle));
+                pt.push(particle);
             }
             particles.push(pt);
         }
@@ -132,7 +130,6 @@ impl State {
         let bb = &self.boundary_box;
         for particle_type in self.particles.iter_mut() {
             particle_type.iter_mut().for_each(|particle| {
-                let particle = particle.get_mut().expect("Can't lock particle");
                 particle.position.x = particle.position.x.rem_euclid(bb.x);
                 particle.position.y = particle.position.y.rem_euclid(bb.y);
                 particle.position.z = particle.position.z.rem_euclid(bb.z);
@@ -147,7 +144,6 @@ impl State {
         let mut v_squared_max = 0.0;
         let mut v_squared_min = f64::MAX;
         self.particles[particle_type_id as usize].iter().for_each(|particle| {
-            let particle = particle.read().expect("Can't lock particle");
             let velocity_squared = particle.velocity.magnitude_squared();
             if velocity_squared > v_squared_max {
                 v_squared_max = velocity_squared;
@@ -169,7 +165,7 @@ impl State {
             for particle in particles {
                 let mut particle = particle.clone();
                 particle.position += position - structure.origin;
-                self.particles[type_id].push(RwLock::new(particle));
+                self.particles[type_id].push(particle);
             }
         }
     }
@@ -193,7 +189,7 @@ impl Default for State {
                                Vector3::new(0.0, 0.0, 0.0))
             .expect("Can't create particle");
         State {
-            particles: vec![vec![RwLock::new(p1), RwLock::new(p2), RwLock::new(p3)]],
+            particles: vec![vec![p1, p2, p3]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         }
     }
@@ -212,7 +208,6 @@ impl Structure {
             particles.push(vec![]);
             let slice = &state.particles[type_id][type_range.clone()];
             for particle in slice {
-                let particle = particle.read().expect("Can't lock particle");
                 particles[type_id].push(particle.clone());
                 mass_center += particle.mass * particle.position;
                 mass += particle.mass;

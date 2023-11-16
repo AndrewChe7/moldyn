@@ -27,7 +27,6 @@ impl Integrator {
                 }
                 state.particles.iter_mut().for_each(|particle_type| {
                     particle_type.iter_mut().for_each(|particle| {
-                        let mut particle = particle.write().expect("Can't lock particle");
                         let acceleration = particle.force / particle.mass;
                         particle.velocity = particle.velocity + acceleration * delta_time / 2.0;
                     });
@@ -39,7 +38,6 @@ impl Integrator {
                 }
                 state.particles.iter_mut().for_each(|particle_type| {
                     particle_type.iter_mut().for_each(|particle| {
-                        let mut particle = particle.write().expect("Can't lock particle");
                         let velocity = particle.velocity;
                         particle.position += velocity * delta_time;
                     });
@@ -48,7 +46,6 @@ impl Integrator {
                 update_force(state);
                 state.particles.iter_mut().for_each(|particle_type| {
                     particle_type.iter_mut().for_each(|particle| {
-                        let mut particle = particle.write().expect("Can't lock particle");
                         let acceleration = particle.force / particle.mass;
                         particle.velocity += acceleration * delta_time / 2.0;
                     });

@@ -343,3 +343,13 @@ pub fn check_impulse (in_file: &PathBuf) {
         }
     }
 }
+
+pub fn particle_count(in_file: &PathBuf) {
+    let data = DataFile::load_from_file(&in_file);
+    ParticleDatabase::load(&data.particles_database);
+    let state = data.frames.get(&0).unwrap();
+    let count: usize = state.particles.iter().map(|(_, type_data)| {
+        type_data.len()
+    }).sum();
+    println!("Particle count: {count}");
+}

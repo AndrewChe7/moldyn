@@ -1,5 +1,4 @@
 use std::mem;
-use std::ops::Deref;
 use std::path::PathBuf;
 use bytemuck::Pod;
 use bytemuck::Zeroable;
@@ -572,8 +571,7 @@ impl State {
         let mut instances = vec![];
         for particle_type in &particles_state.particles {
             for particle in particle_type {
-                let particle = particle.read().expect("Can't lock particle");
-                instances.push(ParticleDataLite::from(particle.deref()));
+                instances.push(ParticleDataLite::from(particle));
             }
         }
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -748,8 +746,7 @@ impl State {
         let center = (bb.x as f32 / 2.0, bb.y as f32 / 2.0, bb.z as f32 / 2.0);
         for particle_type in &state.particles {
             for particle in particle_type {
-                let particle = particle.read().expect("Can't lock particle");
-                data.push(ParticleDataLite::from(particle.deref()));
+                data.push(ParticleDataLite::from(particle));
             }
         }
         self.particles_data = data;

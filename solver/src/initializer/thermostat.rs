@@ -39,7 +39,6 @@ impl Thermostat {
         match self {
             Thermostat::Berendsen {lambda, ..} => {
                 for particle in state.particles[particle_type_id as usize].iter_mut() {
-                    let mut particle = particle.write().expect("Can't lock particle");
                     particle.velocity *= *lambda;
                 }
             }

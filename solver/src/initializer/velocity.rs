@@ -16,14 +16,12 @@ pub fn initialize_velocities_maxwell_boltzmann(state: &mut State, temperature: f
         let z = normal_distribution.sample(&mut rng);
         {
             let particle = &mut state.particles[particle_id as usize][i];
-            let mut particle = particle.write().expect("Can't lock particle");
             particle.velocity.x = x;
             particle.velocity.y = y;
             particle.velocity.z = z;
         }
         {
             let particle = &mut state.particles[particle_id as usize][i + particles_count / 2];
-            let mut particle = particle.write().expect("Can't lock particle");
             particle.velocity.x = -x;
             particle.velocity.y = -y;
             particle.velocity.z = -z;

@@ -164,5 +164,6 @@ pub enum Commands {
         #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ':')]
         range: Option<Vec<usize>>,
     },
-    CheckImpulse
+    CheckImpulse,
+    ParticleCount,
 }

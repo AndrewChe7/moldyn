@@ -17,7 +17,6 @@ pub fn get_center_of_mass_velocity(
     let res: Vector4<f64> = slice
         .into_iter()
         .map(|particle| {
-            let particle = particle.read().expect("Can't lock particle");
             let v = particle.velocity;
             Vector4::new(v.x, v.y, v.z, 1.0) * particle.mass
         })
@@ -29,7 +28,6 @@ pub fn get_center_of_mass_velocity(
 pub fn get_momentum_of_system (state: &State, particle_type_id: u16) -> Vector3<f64> {
     let mut p = Vector3::new(0.0, 0.0, 0.0);
     for particle in &state.particles[particle_type_id as usize] {
-        let particle = particle.read().expect("Can't lock particle");
         p += particle.velocity * particle.mass;
     }
     return p;

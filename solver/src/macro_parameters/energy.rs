@@ -16,7 +16,6 @@ pub fn get_kinetic_energy(state: &State, particle_type_id: u16) -> f64 {
     slice
         .iter()
         .map(|particle| {
-            let particle = particle.read().expect("Can't lock particle");
             particle_kinetic_energy(&particle)
         })
         .sum()
@@ -32,7 +31,6 @@ pub fn get_thermal_energy(
     slice
         .iter()
         .map(|particle| {
-            let particle = particle.read().expect("Can't lock particle");
             particle_thermal_energy(&particle, center_of_mass_velocity)
         })
         .sum()
@@ -44,7 +42,6 @@ pub fn get_potential_energy(state: &State, particle_type_id: u16) -> f64 {
     let res: f64 = slice
         .iter()
         .map(|particle| {
-            let particle = particle.read().expect("Can't lock particle");
             particle.potential
         })
         .sum();

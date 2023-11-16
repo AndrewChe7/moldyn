@@ -1,4 +1,3 @@
-use std::sync::RwLock;
 use nalgebra::Vector3;
 use tempdir::TempDir;
 use moldyn_core::{DataFile, ParticleDatabase};
@@ -59,7 +58,7 @@ fn solvation() {
                                         Vector3::new(-1.0, 1.0, 0.0))
         .expect("Can't create particle");
     let state = moldyn_core::State {
-        particles: vec![vec![RwLock::new(p1), RwLock::new(p2)]],
+        particles: vec![vec![p1, p2]],
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
     let data = DataFile::init_from_state(&state);
@@ -73,8 +72,6 @@ fn solvation() {
     update_force(&mut state);
     let p1 = &state.particles[0][0];
     let p2 = &state.particles[0][1];
-    let p1 = p1.read().expect("Can't lock particle");
-    let p2 = p2.read().expect("Can't lock particle");
     let pos1 = p1.position;
     let pos2 = p2.position;
     let v1 = p1.velocity;

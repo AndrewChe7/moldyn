@@ -1,6 +1,6 @@
 use clap::Parser;
 use crate::args::*;
-use crate::commands::{add_potential_to_file, check_impulse, generate_default_potentials, initialize, solve, solve_macro};
+use crate::commands::{add_potential_to_file, check_impulse, generate_default_potentials, initialize, particle_count, solve, solve_macro};
 
 mod args;
 mod commands;
@@ -68,6 +68,9 @@ fn main() {
         }
         Commands::CheckImpulse => {
             check_impulse(&args.file);
+        }
+        Commands::ParticleCount => {
+            particle_count(&args.file);
         }
         Commands::GenerateDefaultPotentials => {
             generate_default_potentials(&args.file);

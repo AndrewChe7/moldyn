@@ -1,6 +1,5 @@
 use moldyn_core::{Particle, ParticleDatabase, State};
 use na::Vector3;
-use std::sync::RwLock;
 
 /// Particle creation errors
 /// * particle ID didn't found
@@ -38,10 +37,8 @@ impl UnitCell {
                 for x in 0..grid_size.0 {
                     for y in 0..grid_size.1 {
                         for z in 0..grid_size.2 {
-                            let particle = state.particles[particle_id as usize]
-                                [x * grid_size.1 * grid_size.2 + y * grid_size.2 + z]
-                                .get_mut()
-                                .expect("Can't lock particle");
+                            let particle = &mut state.particles[particle_id as usize]
+                                [x * grid_size.1 * grid_size.2 + y * grid_size.2 + z];
                             particle.position = Vector3::new(
                                 start_position.0 + x as f64 * unit_cell_size,
                                 start_position.1 + y as f64 * unit_cell_size,
@@ -60,10 +57,8 @@ impl UnitCell {
                         for z in 0..grid_size.2 {
                             let cell_id = x * grid_size.1 * grid_size.2 + y * grid_size.2 + z;
                             {
-                                let particle = state.particles[particle_id as usize]
-                                    [cell_id * 4]
-                                    .get_mut()
-                                    .expect("Can't lock particle");
+                                let particle = &mut state.particles[particle_id as usize]
+                                    [cell_id * 4];
                                 particle.position = Vector3::new(
                                     start_position.0 + x as f64 * unit_cell_size,
                                     start_position.1 + y as f64 * unit_cell_size,
@@ -71,10 +66,8 @@ impl UnitCell {
                                 );
                             }
                             {
-                                let particle = state.particles[particle_id as usize]
-                                    [cell_id * 4 + 1]
-                                    .get_mut()
-                                    .expect("Can't lock particle");
+                                let particle = &mut state.particles[particle_id as usize]
+                                    [cell_id * 4 + 1];
                                 particle.position = Vector3::new(
                                     start_position.0 + x as f64 * unit_cell_size,
                                     start_position.1 + (y as f64 + 0.5) * unit_cell_size,
@@ -82,10 +75,8 @@ impl UnitCell {
                                 );
                             }
                             {
-                                let particle = state.particles[particle_id as usize]
-                                    [cell_id * 4 + 2]
-                                    .get_mut()
-                                    .expect("Can't lock particle");
+                                let particle = &mut state.particles[particle_id as usize]
+                                    [cell_id * 4 + 2];
                                 particle.position = Vector3::new(
                                     start_position.0 + (x as f64 + 0.5) * unit_cell_size,
                                     start_position.1 + y as f64 * unit_cell_size,
@@ -93,10 +84,8 @@ impl UnitCell {
                                 );
                             }
                             {
-                                let particle = state.particles[particle_id as usize]
-                                    [cell_id * 4 + 3]
-                                    .get_mut()
-                                    .expect("Can't lock particle");
+                                let particle = &mut state.particles[particle_id as usize]
+                                    [cell_id * 4 + 3];
                                 particle.position = Vector3::new(
                                     start_position.0 + (x as f64 + 0.5) * unit_cell_size,
                                     start_position.1 + (y as f64 + 0.5) * unit_cell_size,
@@ -124,7 +113,7 @@ impl UnitCell {
 /// # Returns
 /// State if there is no errors else returns [InitError]
 pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>) -> Result<State, InitError> {
-    let mut particles: Vec<Vec<RwLock<Particle>>> = vec![];
+    let mut particles: Vec<Vec<Particle>> = vec![];
     for i in 0..number_particles.len() {
         let mut particle_type = vec![];
         let particle_type_id = i as u16;
@@ -132,11 +121,11 @@ pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>)
             return Err(InitError::ParticleIdDidNotFound);
         }
         for _ in 0..number_particles[i] {
-            particle_type.push(RwLock::new(
+            particle_type.push(
                 Particle::new(particle_type_id,
                               Vector3::new(0.0, 0.0, 0.0),
                               Vector3::new(0.0, 0.0, 0.0))
-                    .unwrap()));
+                    .unwrap());
         }
         particles.push(particle_type);
     }
