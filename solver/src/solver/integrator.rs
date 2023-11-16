@@ -29,22 +29,22 @@ impl Integrator {
                     particle_type.iter_mut().for_each(|particle| {
                         let mut particle = particle.write().expect("Can't lock particle");
                         let acceleration = particle.force / particle.mass;
-                        let velocity = particle.velocity;
-                        particle.position += velocity * delta_time + acceleration * delta_time * delta_time / 2.0;
-                        particle.velocity += acceleration * delta_time / 2.0;
+                        particle.velocity = particle.velocity + acceleration * delta_time / 2.0;
                     });
                 });
-                state.apply_boundary_conditions();
-                if let Some((barostat, target_pressure)) = barostat.as_ref() {
-                    for particle_type in 0..state.particles.len() {
-                        barostat.update(state, delta_time, particle_type as u16, *target_pressure);
-                    }
-                }
                 if let Some((thermostat, target_temperature)) = thermostat.as_ref() {
                     for particle_type in 0..state.particles.len() {
                         thermostat.update(state, delta_time, particle_type as u16, *target_temperature);
                     }
                 }
+                state.particles.iter_mut().for_each(|particle_type| {
+                    particle_type.iter_mut().for_each(|particle| {
+                        let mut particle = particle.write().expect("Can't lock particle");
+                        let velocity = particle.velocity;
+                        particle.position += velocity * delta_time;
+                    });
+                });
+                state.apply_boundary_conditions();
                 update_force(state);
                 state.particles.iter_mut().for_each(|particle_type| {
                     particle_type.iter_mut().for_each(|particle| {
@@ -53,6 +53,11 @@ impl Integrator {
                         particle.velocity += acceleration * delta_time / 2.0;
                     });
                 });
+                if let Some((barostat, target_pressure)) = barostat.as_ref() {
+                    for particle_type in 0..state.particles.len() {
+                        barostat.update(state, delta_time, particle_type as u16, *target_pressure);
+                    }
+                }
             }
             Integrator::Custom(_) => {
                 todo!()
