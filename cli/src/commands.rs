@@ -1,8 +1,10 @@
 use std::fs;
+use std::fs::{File, OpenOptions};
+use std::io::BufWriter;
 use std::path::PathBuf;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
-use moldyn_core::{DataFile, DataFileMacro, MacroParameterType, ParticleDatabase};
+use moldyn_core::{DataFile, DataFileMacro, HistogramData, MacroParameterType, ParticleDatabase};
 use moldyn_solver::initializer::UnitCell;
 use moldyn_solver::macro_parameters::get_momentum_of_system;
 use moldyn_solver::solver::{Integrator, load_potentials_from_file, Potential, save_potentials_to_file, set_potential, update_force};
@@ -352,4 +354,65 @@ pub fn particle_count(in_file: &PathBuf) {
         type_data.len()
     }).sum();
     println!("Particle count: {count}");
+}
+
+pub fn generate_histogram(in_file: &PathBuf, out_file: &PathBuf, step: usize, particle_types: &[u16]) {
+    let file_dir = in_file.parent().expect("Can't get project folder");
+    let paths = fs::read_dir(file_dir).expect("Can't read directory");
+    let file_path_without_ext = in_file
+        .with_extension("")
+        .with_extension("");
+    let mut sizes: Vec<usize> = vec![];
+    for path in paths {
+        let path = path.expect("Can't get file");
+        let path = path.path();
+        if path.with_extension("").with_extension("") == file_path_without_ext {
+            if let Some(extension) = path.with_extension("").extension() {
+                let extension_string = extension.to_str()
+                    .expect(format!("Can't convert to str {:?}", extension).as_str());
+                if let Ok(last) = extension_string.parse() {
+                    sizes.push(last);
+                }
+            }
+        }
+    }
+    sizes.sort();
+    let res = sizes.binary_search(&step);
+    let file_number = match res {
+        Ok(x) => {
+            if x > sizes.len() {
+                panic!("No such step!")
+            }
+            sizes[x]
+        }
+        Err(x) => {
+            sizes[x]
+        }
+    };
+    let file = in_file.with_extension("").with_extension(format!("{}.json", file_number));
+    let data = DataFile::load_from_file(&file);
+    let state = data.frames.get(&step).unwrap();
+    let mut hist_data = vec![];
+    for particle_type in particle_types {
+        for (_, particle) in &state.particles[particle_type] {
+            let hist = HistogramData {
+                x: particle.velocity.x,
+                y: particle.velocity.y,
+                z: particle.velocity.z,
+                abs: particle.velocity.magnitude(),
+            };
+            hist_data.push(hist);
+        }
+    }
+    let file = if !out_file.exists() {
+        File::create(out_file)
+    } else {
+        OpenOptions::new().truncate(true).write(true).open(out_file)
+    }.expect("Can't write to file");
+    let buf_writer = BufWriter::with_capacity(1073741824, file);
+    let mut wtr = csv::Writer::from_writer(buf_writer);
+    for value in hist_data.iter() {
+        wtr.serialize(value.clone()).expect("Can't serialize data");
+    }
+    wtr.flush().expect("Can't write");
 }

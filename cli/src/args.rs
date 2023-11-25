@@ -164,6 +164,19 @@ pub enum Commands {
         #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ':')]
         range: Option<Vec<usize>>,
     },
+    /// Prints impulse (momentum) on first and last step
     CheckImpulse,
+    /// Prints particle count in simulation
     ParticleCount,
+    /// Outputs to file data for velocities histogram
+    GenerateVelocitiesHistogram {
+        /// file for output
+        #[arg(short = 'o', long)]
+        out_file: PathBuf,
+        /// Step on which histogram will be created
+        #[arg(short = 's', long)]
+        step: usize,
+        #[arg(long, num_args = 1..65536, value_delimiter = ' ')]
+        particle_types: Vec<u16>,
+    },
 }

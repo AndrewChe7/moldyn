@@ -80,6 +80,14 @@ pub struct DataFileStructure {
     pub particles_database: HashMap<u16, ParticleData>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HistogramData {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub abs: f64,
+}
+
 fn ordered_map<S, K, V>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
