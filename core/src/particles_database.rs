@@ -2,15 +2,26 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::option::Option;
 use std::path::Path;
 use std::string::String;
 use std::sync::RwLock;
 
 /// It keeps particle type data in `ParticleDatabase`.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
 pub struct ParticleData {
+    /// Name of a particle
+    pub name: String,
+    /// Particle mass in 10^(-27) kg
+    pub mass: f64,
+    /// Particle radius in nm
+    pub radius: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ParticleDataForSer {
+    pub id: u16,
     /// Name of a particle
     pub name: String,
     /// Particle mass in 10^(-27) kg
@@ -144,6 +155,11 @@ impl ParticleDatabase {
     ///
     /// This function can panic if it can't lock particle database.
     pub fn save_particles_data(path: &Path) -> Result<(), SaveLoadError> {
+        if !path.is_dir() {
+            std::fs::create_dir_all(path).expect(format!("Can't create directory in {}",
+                                                         path.to_str().unwrap()).as_str());
+        }
+        let path = path.join("db.csv");
         let file = if !path.exists() {
             File::create(path)
         } else {
@@ -153,14 +169,25 @@ impl ParticleDatabase {
             return Err(SaveLoadError::CantOpen);
         }
         let file = file.unwrap();
-        let mut buf_writer = BufWriter::new(file);
-        {
-            let particle_data_locked = PARTICLE_DATA.read().expect("Can't lock mutex");
-            let data = &*particle_data_locked;
-            let res = serde_json::ser::to_writer_pretty(&mut buf_writer, data);
+        let buf_writer = BufWriter::with_capacity(1073741824, file);
+        let mut wtr = csv::Writer::from_writer(buf_writer);
+        let particle_data_locked = PARTICLE_DATA.read().expect("Can't lock mutex");
+        let data = &*particle_data_locked;
+        for (id, particle_data) in data {
+            let particle_data_for_ser = ParticleDataForSer {
+                id: *id,
+                name: particle_data.name.clone(),
+                mass: particle_data.mass,
+                radius: particle_data.radius,
+            };
+            let res = wtr.serialize(particle_data_for_ser);
             if res.is_err() {
                 return Err(SaveLoadError::CantWrite);
             }
+        }
+        let res = wtr.flush();
+        if res.is_err() {
+            return Err(SaveLoadError::CantWrite);
         }
         Ok(())
     }
@@ -175,24 +202,27 @@ impl ParticleDatabase {
     ///
     /// This function can panic if it can't lock particle database.
     pub fn load_particles_data(path: &Path) -> Result<(), SaveLoadError> {
-        let file = File::open(path);
-        if file.is_err() {
+        let path = path.join("db.csv");
+        let reader = csv::Reader::from_path(path);
+        if reader.is_err() {
             return Err(SaveLoadError::CantOpen);
         }
-        let file = file.unwrap();
-        let buf_reader = BufReader::new(file);
-        let res = serde_json::de::from_reader(buf_reader);
-        if res.is_err() {
-            return Err(SaveLoadError::CantRead);
-        }
-        let particles_data: HashMap<u16, ParticleData> = res.unwrap();
-        {
-            let mut particle_data_locked = PARTICLE_DATA.write().expect("Can't lock mutex");
-            for particle_data in particles_data {
-                particle_data_locked
-                    .entry(particle_data.0)
-                    .or_insert(particle_data.1);
+        let mut reader = reader.unwrap();
+        let mut particle_data_locked = PARTICLE_DATA.write().expect("Can't lock mutex");
+        for data in reader.deserialize() {
+            if data.is_err() {
+                return Err(SaveLoadError::CantRead);
             }
+            let data: ParticleDataForSer = data.unwrap();
+            let particle_data = ParticleData {
+                name: data.name,
+                mass: data.mass,
+                radius: data.radius,
+            };
+            particle_data_locked
+                .entry(data.id)
+                .or_insert(particle_data);
+
         }
         Ok(())
     }

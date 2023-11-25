@@ -22,10 +22,10 @@ fn main() {
             temperature
         } => {
             initialize(&args.file, crystal_cell_type, size, particle_name,
-                       particle_mass, particle_radius, lattice_cell, temperature, args.pretty_print);
+                       particle_mass, particle_radius, lattice_cell, temperature);
         }
         Commands::Solve {
-            out_file,
+            state_number,
             integrate_method,
             custom_method,
             potentials_file,
@@ -38,14 +38,13 @@ fn main() {
             barostat_params,
             pressure,
         } => {
-            solve(&args.file, out_file, integrate_method,
+            solve(&args.file, *state_number, integrate_method,
                   custom_method, potentials_file, *iteration_count,
-                  delta_time, args.backup,
+                  delta_time,
                   thermostat, thermostat_params, temperature,
-                  barostat, barostat_params, pressure, args.pretty_print);
+                  barostat, barostat_params, pressure);
         }
         Commands::SolveMacroParameters {
-            out_file,
             kinetic_energy,
             potential_energy,
             thermal_energy,
@@ -53,17 +52,16 @@ fn main() {
             pressure,
             custom,
             custom_name,
-            all,
-            range
+            all
         } => {
             if *all {
-                solve_macro(&args.file, out_file, true, true,
+                solve_macro(&args.file,true, true,
                             true, true, true,
-                            *custom, custom_name, range);
+                            *custom, custom_name);
             } else {
-                solve_macro(&args.file, out_file, *kinetic_energy, *potential_energy,
+                solve_macro(&args.file, *kinetic_energy, *potential_energy,
                             *thermal_energy, *temperature, *pressure,
-                            *custom, custom_name, range);
+                            *custom, custom_name);
             }
         }
         Commands::CheckImpulse => {
@@ -83,11 +81,10 @@ fn main() {
             add_potential_to_file(&args.file, particle_types, potential, params);
         }
         Commands::GenerateVelocitiesHistogram {
-            out_file,
-            step,
+            state_number,
             particle_types,
         } => {
-            generate_histogram(&args.file, out_file, *step, &particle_types[..]);
+            generate_histogram(&args.file, *state_number, &particle_types[..]);
         }
     }
 }

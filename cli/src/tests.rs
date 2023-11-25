@@ -1,6 +1,6 @@
 use nalgebra::Vector3;
 use tempdir::TempDir;
-use moldyn_core::{DataFile, ParticleDatabase};
+use moldyn_core::{ParticleDatabase, StateToSave};
 use moldyn_solver::solver::update_force;
 use crate::args::{CrystalCellType, IntegratorChoose};
 use crate::commands::{initialize, solve};
@@ -9,20 +9,15 @@ use crate::commands::{initialize, solve};
 #[test]
 fn initialization() {
     let temp_dir = TempDir::new("test_dir").expect("Can't create temp directory");
-    let mut path = temp_dir.into_path();
-    path.push("test.json");
+    let path = temp_dir.into_path();
     let particle_name = String::from("Argon");
     let mass = 66.335;
     let radius = 0.071;
     let lattice_cell = 3.338339;
     let temperature = 273.15;
-    initialize(&path, &CrystalCellType::U, &vec![10, 10, 10], &particle_name, &mass, &radius, &lattice_cell, &temperature, false);
-    let data = DataFile::load_from_file(&path);
-    assert_eq!(data.frames.len(), 1);
-    assert_eq!(data.start_frame, 0);
-    assert_eq!(data.frame_count, 1);
-    assert_eq!(data.particles_database.len(), 1);
-    ParticleDatabase::load(&data.particles_database);
+    initialize(&path, &CrystalCellType::U, &vec![10, 10, 10], &particle_name, &mass, &radius, &lattice_cell, &temperature);
+    let data = StateToSave::load_from_file(&path, 0);
+    ParticleDatabase::load_particles_data(&path).unwrap();
     assert_ne!(ParticleDatabase::get_particle_name(0), None);
     let name = ParticleDatabase::get_particle_name(0).unwrap();
     let mass = ParticleDatabase::get_particle_mass(0).unwrap();
@@ -30,8 +25,7 @@ fn initialization() {
     assert_eq!(name, "Argon");
     assert_eq!(mass, 66.335);
     assert_eq!(radius, 0.071);
-    let state = data.frames.get(&0).expect("Can't get state");
-    let state: moldyn_core::State = state.into();
+    let state: moldyn_core::State = data.into();
     assert_eq!(state.particles[0].len(), 1000);
     assert_eq!(state.boundary_box.x, 33.38339);
     assert_eq!(state.boundary_box.y, 33.38339);
@@ -41,10 +35,7 @@ fn initialization() {
 #[test]
 fn solvation() {
     let temp_dir = TempDir::new("test_dir").expect("Can't create temp directory");
-    let mut path = temp_dir.into_path();
-    let mut path2 = path.clone();
-    path.push("test.json");
-    path2.push("test2.json");
+    let path = temp_dir.into_path();
     let particle_name = String::from("Argon");
     let mass = 66.335;
     let radius = 0.071;
@@ -61,14 +52,15 @@ fn solvation() {
         particles: vec![vec![p1, p2]],
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
-    let data = DataFile::init_from_state(&state);
-    data.save_to_file(&path, false);
-    solve(&path, &path2, &IntegratorChoose::VerletMethod,
+    let data = StateToSave::from(&state);
+    data.save_to_file(&path, 0);
+    ParticleDatabase::save_particles_data(&path).expect("");
+    solve(&path, 0, &IntegratorChoose::VerletMethod,
           &None, &None, 3, &0.002,
-          100, &None, &None, &None,
-          &None, &None, &None, false);
-    let data = DataFile::load_from_file(&path2.with_extension("3.json"));
-    let (_, mut state) = data.get_last_frame();
+          &None, &None, &None,
+          &None, &None, &None);
+    let data = StateToSave::load_from_file(&path, 3);
+    let mut state = data.into();
     update_force(&mut state);
     let p1 = &state.particles[0][0];
     let p2 = &state.particles[0][1];

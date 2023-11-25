@@ -68,7 +68,7 @@ mod tests {
         update_force(&mut state);
         check_momentum(&state);
         for _ in 0..100000 {
-            verlet_method.calculate(&mut state, 0.002, None, None);
+            verlet_method.calculate(&mut state, 0.002, &mut None, &mut None);
             check_momentum(&state);
         }
     }
@@ -154,7 +154,7 @@ mod tests {
             assert_eq!(format!("{:.8}", f2.y), "0.00000000");
             assert_eq!(format!("{:.8}", f2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, None, None);
+        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -188,7 +188,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, None, None);
+        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -222,7 +222,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, None, None);
+        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -275,7 +275,7 @@ mod tests {
         let verlet = Integrator::VerletMethod;
         update_force(&mut state); // Initialize forces
         for _ in 0..999 {
-            verlet.calculate(&mut state, 0.002, None, None);
+            verlet.calculate(&mut state, 0.002, &mut None, &mut None);
         }
         {
             let p1 = &state.particles[0][0];
@@ -436,7 +436,7 @@ mod tests {
         };
         let verlet = Integrator::VerletMethod;
         for _ in 0..100000 {
-            verlet.calculate(&mut state, 0.002, None, Some((&mut berendsen, 273.15)));
+            verlet.calculate(&mut state, 0.002, &mut None, &mut Some((&mut berendsen, 273.15)));
         }
         let mv = get_center_of_mass_velocity(&state, 0);
         let thermal_energy = get_thermal_energy(&state, 0, &mv);
@@ -463,7 +463,7 @@ mod tests {
         };
         let verlet = Integrator::VerletMethod;
         for _ in 0..100000 {
-            verlet.calculate(&mut state, 0.002, Some((&mut berendsen, 0.101325)), None);
+            verlet.calculate(&mut state, 0.002, &mut Some((&mut berendsen, 0.101325)), &mut None);
         }
         update_force(&mut state);
         let mv = get_center_of_mass_velocity(&state, 0);

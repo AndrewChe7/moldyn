@@ -52,7 +52,7 @@ mod tests {
         let state_data_to_save = StateToSave::from(&state);
         let serialized = serde_json::to_string(&state_data_to_save).unwrap();
         let deserialized: StateToSave = serde_json::from_str(&serialized).unwrap();
-        let deserialized: State = (&deserialized).into();
+        let deserialized: State = deserialized.into();
         for p in &deserialized.particles[0] {
             check_particle_equality(p, &particle);
         }

@@ -14,7 +14,7 @@ use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
-use moldyn_core::{DataFile, Particle, ParticleDatabase};
+use moldyn_core::{Particle, ParticleDatabase, StateToSave};
 use moldyn_solver::initializer::UnitCell;
 use crate::visualizer::camera::Camera;
 use crate::visualizer::camera_controller::CameraController;
@@ -121,9 +121,8 @@ pub struct UiData {
     pub play: bool,
     pub play_speed: usize,
     pub file_path: Option<PathBuf>,
-    pub loaded_frames: [usize; 2],
+    pub loaded_frame: usize,
     pub last_frame_from_all: usize,
-    pub files: Vec<usize>,
     pub visualization_parameter_type: VisualizationParameterType,
     pub macro_plots: Option<MacroPlots>,
     pub show_plot: bool,
@@ -163,7 +162,7 @@ struct State {
     platform: Platform,
     egui_rpass: egui_wgpu_backend::RenderPass,
     _egui_demo: egui_demo_lib::DemoWindows,
-    data_file: Option<DataFile>,
+    data: Option<moldyn_core::State>,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -457,9 +456,8 @@ impl State {
             play: false,
             play_speed: 1,
             file_path: None,
-            loaded_frames: [0, 0],
+            loaded_frame: 0,
             last_frame_from_all: 0,
-            files: vec![],
             visualization_parameter_type: VisualizationParameterType::Velocity,
             macro_plots: None,
             show_plot: false,
@@ -732,7 +730,7 @@ impl State {
             platform,
             egui_rpass,
             _egui_demo: egui_demo,
-            data_file: None,
+            data: None,
         }
     }
 
@@ -854,27 +852,18 @@ impl State {
         self.load_camera_to_buffer();
         let index = self.ui_data.frame_index;
         if let Some(path) = &self.ui_data.file_path {
-            if self.data_file.is_none() ||
-                index < self.ui_data.loaded_frames[0] ||
-                index > self.ui_data.loaded_frames[1]  {
-                let file = self.ui_data.files.iter()
-                    .filter( |x| **x >= index ).min().unwrap();
-                let load_file = path.with_extension("")
-                    .with_extension(format!("{}.json", file));
-                let _ = self.data_file.insert(DataFile::load_from_file(&load_file));
-                let df = self.data_file.as_ref().unwrap();
-                let start = df.start_frame;
-                let end = df.start_frame + df.frame_count - 1;
-                self.ui_data.loaded_frames[0] = start;
-                self.ui_data.loaded_frames[1] = end;
+            if self.data.is_none() ||
+                index != self.ui_data.loaded_frame  {
+                let state = StateToSave::load_from_file(path, index);
+                let _ = self.data.insert(state.into());
+                self.ui_data.loaded_frame = index;
             }
         }
-        if let Some(df) = &self.data_file {
-            if index >= self.ui_data.loaded_frames[0] &&
-                index <= self.ui_data.loaded_frames[1] {
-                let state = &df.frames.get(&self.ui_data.frame_index).unwrap().into();
+        if self.data.is_some() {
+            if index == self.ui_data.loaded_frame {
+                let state = self.data.clone().unwrap();
                 let frames_count = self.ui_data.last_frame_from_all + 1;
-                self.update_particle_state(state);
+                self.update_particle_state(&state);
                 self.update_instance_buffer();
                 if self.ui_data.play {
                     self.ui_data.frame_index += self.ui_data.play_speed;

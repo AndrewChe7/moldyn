@@ -12,7 +12,7 @@ pub enum Integrator {
 impl Integrator {
     /// Just integrator iteration
     pub fn calculate(&self, state: &mut State, delta_time: f64,
-                     mut barostat: Option<(&mut Barostat, f64)>, mut thermostat: Option<(&mut Thermostat, f64)>) {
+                     barostat: &mut Option<(&mut Barostat, f64)>, thermostat: &mut Option<(&mut Thermostat, f64)>) {
         match self {
             Integrator::VerletMethod => {
                 if let Some((barostat, target_pressure)) = barostat.as_mut() {

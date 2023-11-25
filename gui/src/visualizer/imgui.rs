@@ -1,4 +1,5 @@
 use std::fs;
+use std::fs::ReadDir;
 use std::ops::RangeInclusive;
 use egui::Context;
 use egui::plot::{Corner, Legend, Line, Plot, PlotPoints};
@@ -39,6 +40,17 @@ pub fn main_window_ui(ui_data: &mut UiData, ctx: &Context) {
     });
 }
 
+fn get_last_path (paths: ReadDir) -> usize {
+    paths.map(|path| {
+        let path = path.unwrap();
+        let i: usize = path.path().with_extension("")
+            .file_name().unwrap()
+            .to_str().unwrap()
+            .parse().unwrap();
+        i
+    }).max().unwrap()
+}
+
 fn main_menu(ui: &mut egui::Ui, ui_data: &mut UiData,) {
     use egui::menu;
     menu::bar(ui, |ui| {
@@ -48,41 +60,18 @@ fn main_menu(ui: &mut egui::Ui, ui_data: &mut UiData,) {
                 {
                     let future = async {
                         let df = AsyncFileDialog::new()
-                            .add_filter("simulation", &["json"])
-                            .pick_file()
+                            .pick_folder()
                             .await;
                         if let Some(df) = df {
                             let in_file = df.path();
-                            let file_dir = in_file.parent().expect("Can't get project folder");
-                            let paths = fs::read_dir(file_dir).expect("Can't read directory");
-                            let file_path_without_ext = in_file
-                                .with_extension("")
-                                .with_extension("");
-                            let mut sizes: Vec<usize> = vec![];
+                            let paths = fs::read_dir(in_file.join("data")).expect("Can't read directory");
+                            let end = get_last_path(paths);
                             ui_data.macro_plots = None;
                             let mut macro_data = None;
-                            for path in paths {
-                                let path = path.expect("Can't get file");
-                                let path = path.path();
-                                let path_no_json = path.with_extension("");
-                                if path_no_json.with_extension("") == file_path_without_ext {
-                                    if let Some(extension) = path_no_json.extension() {
-                                        if let Some(extension_string) = extension.to_str() {
-                                            if let Ok(last) = extension_string.parse() {
-                                                sizes.push(last);
-                                            }
-                                        }
-                                    }
-                                } else if path_no_json.with_extension("").with_extension("") == file_path_without_ext &&
-                                    path_no_json.extension().unwrap() == "macro" {
-                                    let data = DataFileMacro::load_from_file(&path);
-                                    if macro_data.is_none() {
-                                        let _ = macro_data.insert(data);
-                                    } else {
-                                        let macro_data = macro_data.as_mut().unwrap();
-                                        macro_data.append_data(&data);
-                                    }
-                                }
+                            let macro_file = df.path().join("macro.csv");
+                            if macro_file.is_file() {
+                                let data = DataFileMacro::load_from_file(&macro_file);
+                                let _ = macro_data.insert(data);
                             }
                             if macro_data.is_some() {
                                 let _ = ui_data.macro_plots.insert(MacroPlots::new());
@@ -105,11 +94,8 @@ fn main_menu(ui: &mut egui::Ui, ui_data: &mut UiData,) {
                                         macro_plots.temperature.push([x.clone() as f64, y.temperature]);
                                     });
                             }
-
-                            let end = sizes.iter().max().unwrap();
-                            ui_data.last_frame_from_all = end.clone() - 1;
+                            ui_data.last_frame_from_all = end.clone();
                             let _ = ui_data.file_path.insert(in_file.to_path_buf());
-                            ui_data.files = sizes;
                         }
                     };
                     pollster::block_on(future);
