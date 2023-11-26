@@ -1,6 +1,5 @@
-use std::ops::Range;
 use crate::ParticleDatabase;
-use na::{Rotation3, Scale3, Vector3};
+use na::Vector3;
 
 /// Structure that keeps all data for particle
 #[derive(Clone, Debug)]
@@ -30,14 +29,6 @@ pub struct State {
     pub particles: Vec<Vec<Particle>>,
     /// Boundary conditions for current state
     pub boundary_box: Vector3<f64>,
-}
-
-/// Okey it's tautology but it is structure that keeps data for particle structures
-/// like some biological protein staff or other physical structures.
-#[derive(Debug)]
-pub struct Structure {
-    pub particles: Vec<Vec<Particle>>,
-    pub origin: Vector3<f64>,
 }
 
 impl Particle {
@@ -154,21 +145,6 @@ impl State {
         });
         (v_squared_min.sqrt(), v_squared_max.sqrt())
     }
-
-    /// Add structure to current state with all transforms
-    ///
-    /// > **Warning**
-    /// > WIP. No transforms yet, only position
-    pub fn append_structure (&mut self, structure: &Structure,
-                             position: Vector3<f64>, _rotation: Rotation3<f64>, _scale: Scale3<f64>) {
-        for (type_id, particles) in structure.particles.iter().enumerate() {
-            for particle in particles {
-                let mut particle = particle.clone();
-                particle.position += position - structure.origin;
-                self.particles[type_id].push(particle);
-            }
-        }
-    }
 }
 
 impl Default for State {
@@ -191,32 +167,6 @@ impl Default for State {
         State {
             particles: vec![vec![p1, p2, p3]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
-        }
-    }
-}
-
-impl Structure {
-    /// Creates structure from part of a state. You could choose which particles to use with select
-    /// ranges.
-    ///
-    /// For each type there is range in `select` argument.
-    pub fn from_state (state: &State, select: &[Range<usize>]) -> Self {
-        let mut particles = vec![];
-        let mut mass_center = Vector3::new(0.0, 0.0, 0.0);
-        let mut mass = 0.0;
-        for (type_id, type_range) in select.iter().enumerate() {
-            particles.push(vec![]);
-            let slice = &state.particles[type_id][type_range.clone()];
-            for particle in slice {
-                particles[type_id].push(particle.clone());
-                mass_center += particle.mass * particle.position;
-                mass += particle.mass;
-            }
-        }
-        mass_center /= mass;
-        Self {
-            particles,
-            origin: mass_center,
         }
     }
 }

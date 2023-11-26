@@ -1,26 +1,28 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::path::Path;
 use itertools::Itertools;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
-use crate::{Particle, ParticleDatabase, State, Structure};
-use crate::particles_database::ParticleData;
+use crate::{Particle, ParticleDatabase, State};
 
 /// Serialization struct for [Particle]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParticleToSave {
-    pub position: Vector3<f64>,
-    pub velocity: Vector3<f64>,
     pub id: u16,
+    pub position_x: f64,
+    pub position_y: f64,
+    pub position_z: f64,
+    pub velocity_x: f64,
+    pub velocity_y: f64,
+    pub velocity_z: f64,
 }
 
 /// Serialization struct for [State]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StateToSave {
-    #[serde(serialize_with = "ordered_map")]
-    pub particles: HashMap<u16, HashMap<usize, ParticleToSave>>,
+    pub particles: Vec<ParticleToSave>,
     pub boundary_box: Vector3<f64>,
 }
 
@@ -48,21 +50,6 @@ pub struct MacroParameters {
     pub custom: f64,
 }
 
-/// Structure to serialize animation data for particles
-#[derive(Serialize, Deserialize, Clone)]
-pub struct DataFile {
-    /// Each frame is state with particles and boundary conditions
-    #[serde(serialize_with = "ordered_map")]
-    pub frames: HashMap<usize, StateToSave>,
-    /// Particles that was in use in simulation
-    #[serde(serialize_with = "ordered_map")]
-    pub particles_database: HashMap<u16, ParticleData>,
-    /// First frame in file
-    pub start_frame: usize,
-    /// Count of frames in simulation
-    pub frame_count: usize,
-}
-
 /// Structure to serialize macro parameters
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DataFileMacro {
@@ -73,19 +60,10 @@ pub struct DataFileMacro {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct DataFileStructure {
-    #[serde(serialize_with = "ordered_map")]
-    pub particles: HashMap<u16, HashMap<usize, ParticleToSave>>,
-    pub origin: [f64; 3],
-    pub particles_database: HashMap<u16, ParticleData>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct HistogramData {
+pub struct VectorData {
     pub x: f64,
     pub y: f64,
     pub z: f64,
-    pub abs: f64,
 }
 
 fn ordered_map<S, K, V>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
@@ -107,8 +85,8 @@ impl ParticleToSave {
         let radius = ParticleDatabase::get_particle_radius(id).unwrap();
         Some(
             Particle {
-                position: self.position,
-                velocity: self.velocity,
+                position: Vector3::new(self.position_x, self.position_y, self.position_z),
+                velocity: Vector3::new(self.velocity_x, self.velocity_y, self.velocity_z),
                 force: Default::default(),
                 potential: 0.0,
                 temp: 0.0,
@@ -121,59 +99,136 @@ impl ParticleToSave {
 
     pub fn from(particle: &Particle) -> ParticleToSave {
         ParticleToSave {
-            position: particle.position,
-            velocity: particle.velocity,
+            position_x: particle.position.x,
+            position_y: particle.position.y,
+            position_z: particle.position.z,
+            velocity_x: particle.velocity.x,
+            velocity_y: particle.velocity.y,
+            velocity_z: particle.velocity.z,
             id: particle.id,
         }
     }
 }
 
-impl StateToSave {
-    pub fn from(state: &State) -> Self {
-        let mut particles: HashMap<u16, HashMap<usize, ParticleToSave>> = HashMap::new();
+impl From<&State> for StateToSave {
+    fn from(state: &State) -> Self {
         let boundary_box = state.boundary_box;
-        for (id, particle_type) in state.particles.iter().enumerate() {
-            let id = id as u16;
-            particles.insert(id, HashMap::new());
-
-            for (i, particle) in particle_type.iter().enumerate() {
-                let particle = ParticleToSave {
-                    position: particle.position,
-                    velocity: particle.velocity,
-                    id: particle.id,
-                };
-                particles.get_mut(&id).unwrap().insert(i, particle);
-            }
-        }
+        let mut particles: Vec<ParticleToSave> = vec![];
+        state.particles.iter().for_each(|t| {
+            t.iter().for_each(|particle| {
+                particles.push(ParticleToSave::from(particle));
+            });
+        });
         Self {
             particles,
             boundary_box,
         }
     }
+}
 
-    pub fn into(&self) -> State {
-        let particle_type_count = self.particles.len();
+impl Into<State> for StateToSave {
+    fn into(self) -> State {
         let mut particles = vec![];
-        for particle_type in 0..particle_type_count {
-            particles.push(vec![]);
-            let particle_type = particle_type as u16;
-            let particles_with_type = self.particles.get(&particle_type)
-                .expect("No particle type");
-            let particles_count = particles_with_type.len();
-            for _ in 0..particles_count {
-                particles[particle_type as usize].push(Particle::default());
+        let mut max_id = 0;
+        for particle in self.particles.iter() {
+            if particle.id > max_id {
+                max_id = particle.id;
             }
+        }
+        for _ in 0..=max_id {
+            particles.push(vec![]);
+        }
+        for particle in self.particles.iter() {
+            let particle: Particle = particle.into().expect("Can't convert particle");
+            particles[particle.id as usize].push(particle);
         }
         let boundary_box = self.boundary_box;
-        for (id, particle_type) in self.particles.iter() {
-            for (i, particle) in particle_type {
-                let particle: Particle = particle.into().expect("No particle in database");
-                particles[*id as usize][*i] = particle;
-            }
-        }
         State {
             particles,
             boundary_box,
+        }
+    }
+}
+
+impl StateToSave {
+
+    fn get_bbs(path: &Path) -> Vec<Vector3<f64>> {
+        let mut bbs: Vec<Vector3<f64>> = vec![];
+        let mut reader = csv::Reader::from_path(path).expect("Can't open file");
+        for data in reader.deserialize() {
+            let bb: VectorData = data.expect("Can't deserialize");
+            bbs.push(Vector3::new(bb.x, bb.y, bb.z));
+        }
+        bbs
+    }
+
+    fn save_bb(&self, path: &Path, state_number: usize) {
+        let bb_file = if !path.exists() {
+            File::create(path)
+        } else {
+            OpenOptions::new().write(true).open(path)
+        }.expect("Can't write to file");
+        let mut bbs = Self::get_bbs(path);
+        if bbs.len() > state_number {
+            bbs[state_number] = self.boundary_box;
+        } else {
+            bbs.push(self.boundary_box);
+        }
+        let buf_writer = BufWriter::with_capacity(1073741824, bb_file);
+        let mut wtr = csv::Writer::from_writer(buf_writer);
+        for value in bbs {
+            wtr.serialize(VectorData { x: value.x, y: value.y, z: value.z })
+                .expect("Can't serialize data");
+        }
+        wtr.flush().expect("Can't write");
+    }
+
+    fn load_bb(path:&Path, state_number: usize) -> Vector3<f64> {
+        let bbs = Self::get_bbs(path);
+        let bb = bbs[state_number];
+        bb
+    }
+
+    pub fn save_to_file(&self, path: &Path, state_number: usize) {
+        if !path.is_dir() {
+            std::fs::create_dir_all(path).expect(format!("Can't create directory in {}",
+                                                         path.to_str().unwrap()).as_str());
+        }
+
+        let bb_path = path.join("bb.csv");
+        self.save_bb(&bb_path, state_number);
+        let path = path.join("data");
+        if !path.is_dir() {
+            std::fs::create_dir_all(&path).expect(format!("Can't create directory in {}",
+                                                         path.to_str().unwrap()).as_str());
+        }
+        let path = path.join(format!("{state_number}.csv"));
+        let file = if !path.exists() {
+            File::create(path)
+        } else {
+            OpenOptions::new().truncate(true).write(true).open(path)
+        }.expect("Can't write to file");
+        let buf_writer = BufWriter::with_capacity(1073741824, file);
+        let mut wtr = csv::Writer::from_writer(buf_writer);
+        for value in self.particles.iter() {
+            wtr.serialize(value.clone()).expect("Can't serialize data");
+        }
+        wtr.flush().expect("Can't write");
+    }
+
+    pub fn load_from_file(path: &Path, state_number: usize) -> Self {
+        let bb_path = path.join("bb.csv");
+        let bb = Self::load_bb(&bb_path, state_number);
+        let path = path.join("data").join(format!("{state_number}.csv"));
+        let mut reader = csv::Reader::from_path(path).expect("Can't open file");
+        let mut particles = vec![];
+        for data in reader.deserialize() {
+            let data: ParticleToSave = data.expect("Can't parse row");
+            particles.push(data);
+        }
+        Self {
+            particles,
+            boundary_box: bb,
         }
     }
 }
@@ -293,147 +348,5 @@ impl DataFileMacro {
 impl Default for DataFileMacro {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl DataFile {
-    /// Creates new data file structure from existing state
-    pub fn init_from_state(state: &State) -> DataFile {
-        let particles_database = {
-            let particle_database = ParticleDatabase::get_data();
-            let hash_table = particle_database.read()
-                .expect("Can't lock particles database");
-            hash_table.clone()
-        };
-        let mut frames = HashMap::new();
-        let state = StateToSave::from(state);
-        frames.insert(0, state);
-        DataFile {
-            frames,
-            particles_database,
-            start_frame: 0,
-            frame_count: 1,
-        }
-    }
-
-    /// Add new state to data file structure
-    pub fn add_state(&mut self, state: &State) {
-        let state = StateToSave::from(state);
-        let last_frame = self.start_frame + self.frame_count;
-        self.frames.insert(last_frame, state);
-        self.frame_count += 1;
-    }
-
-    /// Save all data to file
-    pub fn save_to_file (&self, path: &Path, pretty_print: bool) {
-        let file = if !path.exists() {
-            File::create(path)
-        } else {
-            OpenOptions::new().truncate(true).write(true).open(path)
-        }.expect("Can't write to file");
-        let mut buf_writer = BufWriter::with_capacity(1073741824, file);
-        if pretty_print {
-            serde_json::ser::to_writer_pretty(&mut buf_writer, &self)
-                .expect("Can't save data to file");
-        } else {
-            serde_json::ser::to_writer(&mut buf_writer, &self)
-                .expect("Can't save data to file");
-        }
-    }
-
-    /// Removes old frames. This function is used when you want to keep your data in separate files.
-    pub fn reset_old(&mut self) {
-        self.frames.clear();
-        self.start_frame += self.frame_count;
-        self.frame_count = 0;
-    }
-
-    /// Load data file structure from file
-    pub fn load_from_file (path: &Path) -> Self {
-        let file = File::open(path).expect("Can't open file to read");
-        let buf_reader = BufReader::with_capacity(1073741824, file);
-        let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
-        data_file
-    }
-
-    /// Get last frame state from data file structure
-    pub fn get_last_frame(&self) -> (usize, State) {
-        let last_frame_number = self.start_frame + self.frame_count - 1;
-        let last_frame = self.frames.get(&last_frame_number)
-            .expect("Can't get frame");
-        (last_frame_number, last_frame.into())
-    }
-}
-
-impl DataFileStructure {
-    fn from(structure: &Structure) -> Self {
-        let particles_database = {
-            let particle_database = ParticleDatabase::get_data();
-            let hash_table = particle_database.read()
-                .expect("Can't lock particles database");
-            hash_table.clone()
-        };
-        let mut particles: HashMap<u16, HashMap<usize, ParticleToSave>> = HashMap::new();
-        for (id, particle_type) in structure.particles.iter().enumerate() {
-            let id = id as u16;
-            particles.insert(id, HashMap::new());
-
-            for (i, particle) in particle_type.iter().enumerate() {
-                let particle = ParticleToSave {
-                    position: particle.position,
-                    velocity: particle.velocity,
-                    id: particle.id,
-                };
-                particles.get_mut(&id).unwrap().insert(i, particle);
-            }
-        }
-        Self {
-            particles,
-            particles_database,
-            origin: structure.origin.into(),
-        }
-    }
-
-    fn into(&self) -> Structure {
-        let particle_type_count = self.particles.len();
-        let mut particles = vec![];
-        for particle_type in 0..particle_type_count {
-            particles.push(vec![]);
-            let particle_type = particle_type as u16;
-            let particles_with_type = self.particles.get(&particle_type)
-                .expect("No particle type");
-            let particles_count = particles_with_type.len();
-            for _ in 0..particles_count {
-                particles[particle_type as usize].push(Particle::default());
-            }
-        }
-        for (id, particle_type) in self.particles.iter() {
-            for (i, particle) in particle_type {
-                let particle: Particle = particle.into().expect("No particle in database");
-                particles[*id as usize][*i] = particle;
-            }
-        }
-        Structure {
-            particles,
-            origin: self.origin.into(),
-        }
-    }
-
-    pub fn save_to_file (&self, path: &Path) {
-        let file = if !path.exists() {
-            File::create(path)
-        } else {
-            OpenOptions::new().truncate(true).write(true).open(path)
-        }.expect("Can't write to file");
-        let mut buf_writer = BufWriter::with_capacity(1073741824, file);
-        serde_json::ser::to_writer(&mut buf_writer, &self)
-            .expect("Can't save data to file");
-    }
-
-    pub fn load_from_file (path: &Path) -> Self {
-        let file = File::open(path).expect("Can't open file to read");
-        let buf_reader = BufReader::with_capacity(1073741824, file);
-        let data_file: Self = serde_json::de::from_reader(buf_reader).expect("Can't read file");
-        data_file
     }
 }

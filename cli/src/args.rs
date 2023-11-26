@@ -98,9 +98,8 @@ pub enum Commands {
     },
     /// run solver on particle state
     Solve {
-        /// file for output
-        #[arg(short = 'o', long)]
-        out_file: PathBuf,
+        #[arg(short = 's', long)]
+        state_number: usize,
         /// method of integration
         #[arg(short = 'i', long)]
         integrate_method: IntegratorChoose,
@@ -137,9 +136,6 @@ pub enum Commands {
     },
     /// calculate macro parameters for solved state
     SolveMacroParameters {
-        /// file for output
-        #[arg(short = 'o', long)]
-        out_file: PathBuf,
         #[arg(short = 'k', long)]
         kinetic_energy: bool,
         #[arg(short = 'p', long)]
@@ -159,10 +155,6 @@ pub enum Commands {
         /// Calculate all macro parameters
         #[arg(short = 'A', long)]
         all: bool,
-        #[doc()]
-        /// Which frames should be processed (start:end:step)
-        #[arg(short = 'r', long, num_args = 1..3, value_delimiter = ':')]
-        range: Option<Vec<usize>>,
     },
     /// Prints impulse (momentum) on first and last step
     CheckImpulse,
@@ -170,12 +162,9 @@ pub enum Commands {
     ParticleCount,
     /// Outputs to file data for velocities histogram
     GenerateVelocitiesHistogram {
-        /// file for output
-        #[arg(short = 'o', long)]
-        out_file: PathBuf,
         /// Step on which histogram will be created
         #[arg(short = 's', long)]
-        step: usize,
+        state_number: usize,
         #[arg(long, num_args = 1..65536, value_delimiter = ' ')]
         particle_types: Vec<u16>,
     },
