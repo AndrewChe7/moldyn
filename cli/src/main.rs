@@ -1,3 +1,4 @@
+use std::time::Instant;
 use clap::Parser;
 use crate::args::*;
 use crate::commands::{add_potential_to_file, check_impulse, generate_default_potentials, generate_histogram, initialize, particle_count, solve, solve_macro};
@@ -11,6 +12,7 @@ mod tests;
 fn main() {
     env_logger::init();
     let args = Args::parse();
+    let start = Instant::now();
     match &args.command {
         Commands::Initialize {
             crystal_cell_type,
@@ -27,6 +29,7 @@ fn main() {
         Commands::Solve {
             state_number,
             integrate_method,
+            threads_count,
             custom_method,
             potentials_file,
             iteration_count,
@@ -38,6 +41,11 @@ fn main() {
             barostat_params,
             pressure,
         } => {
+            if let Some(threads_count) = threads_count {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(*threads_count)
+                    .build_global().unwrap();
+            }
             solve(&args.file, *state_number, integrate_method,
                   custom_method, potentials_file, *iteration_count,
                   delta_time,
@@ -86,5 +94,9 @@ fn main() {
         } => {
             generate_histogram(&args.file, *state_number, &particle_types[..]);
         }
+    }
+    let duration = start.elapsed();
+    if args.time {
+        println!("Time elapsed: {}", duration.as_secs_f64());
     }
 }

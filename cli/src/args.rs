@@ -8,12 +8,9 @@ pub struct Args {
     /// path to file with particles data
     #[arg(short = 'f', long)]
     pub file: PathBuf,
-    /// outputs in human-readable format
+    /// Measure time of work
     #[arg(long, default_value_t=false)]
-    pub pretty_print: bool,
-    /// how often to make backup
-    #[arg(short, long, default_value_t=2000)]
-    pub backup: usize,
+    pub time: bool,
     /// how often to save state
     #[arg(long, default_value_t=1)]
     pub frames_per_save: usize,
@@ -103,6 +100,8 @@ pub enum Commands {
         /// method of integration
         #[arg(short = 'i', long)]
         integrate_method: IntegratorChoose,
+        #[arg(long)]
+        threads_count: Option<usize>,
         /// if integrate method is custom, this parameter must be set
         #[arg(long)]
         custom_method: Option<String>,

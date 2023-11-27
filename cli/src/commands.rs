@@ -15,9 +15,7 @@ const PROGRESS_BAR_SYMBOLS: &str = "█▉▊▋▌▍▎▏  ";
 const PROGRESS_BAR_STYLE: &str = "{prefix:.bold}▕{wide_bar:.red}▏{pos:>7}/{len:7} {eta_precise:9} |";
 
 pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf) {
-    let mut backup_file = out_file.clone();
-    backup_file.set_extension("macro.csv");
-    data.save_to_file(&backup_file);
+    data.save_to_file(&out_file);
     data.reset_old();
 }
 
@@ -213,7 +211,7 @@ pub fn solve_macro(file: &PathBuf,
     pb.set_prefix("Solving macro steps: ");
     let mut macro_data = DataFileMacro::new();
     ParticleDatabase::load_particles_data(file).expect("Can't load particle database");
-    for i in start..end {
+    for i in start..=end {
         let state_data = StateToSave::load_from_file(file, i);
         let mut state: moldyn_core::State = state_data.into();
         let particle_count = state.particles.iter().map( |t| t.len() ).sum();
@@ -255,7 +253,7 @@ pub fn solve_macro(file: &PathBuf,
         macro_data.add_macro_params(i, &parameters, particle_count);
         pb.inc(1);
     }
-    backup_macro(&mut macro_data, &file.join("db.csv"));
+    backup_macro(&mut macro_data, &file.join("macro.csv"));
     pb.finish();
 }
 
@@ -289,6 +287,7 @@ pub fn check_impulse (file: &PathBuf) {
 
 pub fn particle_count(file: &PathBuf) {
     let data = StateToSave::load_from_file(file, 0);
+    ParticleDatabase::load_particles_data(file).expect("Can't load particle database");
     let state: State = data.into();
     let count: usize = state.particles.iter().map(| type_data | {
         type_data.len()
@@ -300,6 +299,7 @@ pub fn generate_histogram(in_file: &PathBuf,
                           state_number: usize,
                           particle_types: &[u16]) {
     let data = StateToSave::load_from_file(in_file, state_number);
+    ParticleDatabase::load_particles_data(in_file).expect("Can't load particle database");
     let state: State = data.into();
     let mut hist_data = vec![];
     for particle_type in particle_types {
