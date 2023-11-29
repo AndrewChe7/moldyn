@@ -1,10 +1,10 @@
 use std::fs;
-use std::fs::{File, OpenOptions, ReadDir};
+use std::fs::ReadDir;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use indicatif::{ProgressBar, ProgressStyle};
 use nalgebra::Vector3;
-use moldyn_core::{DataFileMacro, VectorData, MacroParameterType, ParticleDatabase, State, StateToSave};
+use moldyn_core::{DataFileMacro, VectorData, MacroParameterType, ParticleDatabase, State, StateToSave, open_file_or_create};
 use moldyn_solver::initializer::UnitCell;
 use moldyn_solver::macro_parameters::get_momentum_of_system;
 use moldyn_solver::solver::{Integrator, load_potentials_from_file, Potential, save_potentials_to_file, set_potential, update_force};
@@ -81,7 +81,7 @@ pub fn solve(file: &PathBuf,
              state_number: usize,
              integrator: &IntegratorChoose,
              _custom_method: &Option<String>,
-             potentials_file: &Option<PathBuf>,
+             use_potentials: &bool,
              iteration_count: usize,
              delta_time: &f64,
              thermostat_choose: &Option<ThermostatChoose>,
@@ -93,8 +93,8 @@ pub fn solve(file: &PathBuf,
     let data = StateToSave::load_from_file(file, state_number);
     ParticleDatabase::load_particles_data(file).expect("Can't load particle database");
     let mut state = data.into();
-    if let Some(potentials_file) = potentials_file {
-        load_potentials_from_file(potentials_file);
+    if *use_potentials {
+        load_potentials_from_file(file);
     }
     update_force(&mut state);
     let integrator = match integrator {
@@ -196,10 +196,13 @@ pub fn solve_macro(file: &PathBuf,
                    temperature: bool,
                    pressure: bool,
                    custom: bool,
-                   _custom_name: &Option<String>) {
+                   _custom_name: &Option<String>,
+                   use_potentials: &bool) {
     let paths = fs::read_dir(file.join("data"))
         .expect("Can't read directory");
-
+    if *use_potentials {
+        load_potentials_from_file(file);
+    }
     let start = 0;
     let end = get_last_path(paths);
     let pb = ProgressBar::new((end - start) as u64);
@@ -313,11 +316,7 @@ pub fn generate_histogram(in_file: &PathBuf,
         }
     }
     let out_file = in_file.join("hist.csv");
-    let file = if !out_file.exists() {
-        File::create(out_file)
-    } else {
-        OpenOptions::new().truncate(true).write(true).open(out_file)
-    }.expect("Can't write to file");
+    let file = open_file_or_create(&out_file);
     let buf_writer = BufWriter::with_capacity(1073741824, file);
     let mut wtr = csv::Writer::from_writer(buf_writer);
     for value in hist_data.iter() {

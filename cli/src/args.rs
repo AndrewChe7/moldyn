@@ -95,13 +95,13 @@ pub enum Commands {
     },
     /// run solver on particle state
     Solve {
+        #[arg(long)]
+        threads_count: Option<usize>,
         #[arg(short = 's', long)]
         state_number: usize,
         /// method of integration
         #[arg(short = 'i', long)]
         integrate_method: IntegratorChoose,
-        #[arg(long)]
-        threads_count: Option<usize>,
         /// if integrate method is custom, this parameter must be set
         #[arg(long)]
         custom_method: Option<String>,
@@ -123,9 +123,10 @@ pub enum Commands {
         /// Thermostat target temperature (in K)
         #[arg(short = 'T', long)]
         temperature: Option<f64>,
-        /// file with potentials for any id pair
+        /// Use file with potentials for any id pair (potential.json).
+        /// If not it uses default potential for Argon
         #[arg(short = 'p', long)]
-        potentials_file: Option<PathBuf>,
+        use_potentials: bool,
         /// how much iterations to count
         #[arg(short = 'c', long)]
         iteration_count: usize,
@@ -154,6 +155,10 @@ pub enum Commands {
         /// Calculate all macro parameters
         #[arg(short = 'A', long)]
         all: bool,
+        /// Use file with potentials for any id pair (potential.json).
+        /// If not it uses default potential for Argon
+        #[arg(long)]
+        use_potentials: bool,
     },
     /// Prints impulse (momentum) on first and last step
     CheckImpulse,

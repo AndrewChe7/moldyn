@@ -174,6 +174,11 @@ pub fn save_potentials_to_file (path: &PathBuf) {
     for (k, v) in db.iter() {
         let _ = new_db.insert(format!("{},{}", k.0, k.1), v.as_ref().clone());
     }
+    if !path.is_dir() {
+        std::fs::create_dir_all(&path).expect(format!("Can't create directory in {}",
+                                                      path.to_str().unwrap()).as_str());
+    }
+    let path = path.join("potentials.json");
     let file = if path.exists() {
         OpenOptions::new().truncate(true).write(true).open(path).expect("Can't open file")
     } else {
@@ -186,6 +191,7 @@ pub fn save_potentials_to_file (path: &PathBuf) {
 
 /// Load potentials database to file
 pub fn load_potentials_from_file (path: &PathBuf) {
+    let path = path.join("potentials.json");
     let file = File::open(path).expect("Can't open file");
     let buf_reader = BufReader::new(file);
     let data: HashMap<String, Potential> = serde_json::de::from_reader(buf_reader)

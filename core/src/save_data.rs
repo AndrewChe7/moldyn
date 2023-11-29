@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{File, OpenOptions};
 use std::io::BufWriter;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use itertools::Itertools;
 use na::Vector3;
 use serde::{Deserialize, Serialize, Serializer};
-use crate::{Particle, ParticleDatabase, State};
+use crate::{open_file_or_create, Particle, ParticleDatabase, State};
 
 /// Serialization struct for [Particle]
 #[derive(Serialize, Deserialize, Clone)]
@@ -203,11 +203,7 @@ impl StateToSave {
                                                          path.to_str().unwrap()).as_str());
         }
         let path = path.join(format!("{state_number}.csv"));
-        let file = if !path.exists() {
-            File::create(path)
-        } else {
-            OpenOptions::new().truncate(true).write(true).open(path)
-        }.expect("Can't write to file");
+        let file = open_file_or_create(&path);
         let buf_writer = BufWriter::with_capacity(1073741824, file);
         let mut wtr = csv::Writer::from_writer(buf_writer);
         for value in self.particles.iter() {
@@ -292,12 +288,8 @@ impl DataFileMacro {
     }
 
     /// Save all macro parameters to file. It uses CSV format.
-    pub fn save_to_file (&self, path: &Path) {
-        let file = if !path.exists() {
-            File::create(path)
-        } else {
-            OpenOptions::new().truncate(true).write(true).open(path)
-        }.expect("Can't write to file");
+    pub fn save_to_file (&self, path: &PathBuf) {
+        let file = open_file_or_create(path);
         let buf_writer = BufWriter::with_capacity(1073741824, file);
         let mut wtr = csv::Writer::from_writer(buf_writer);
         for (_key, value) in self.macro_parameters.iter()

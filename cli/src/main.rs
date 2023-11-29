@@ -31,7 +31,7 @@ fn main() {
             integrate_method,
             threads_count,
             custom_method,
-            potentials_file,
+            use_potentials,
             iteration_count,
             delta_time,
             thermostat,
@@ -47,7 +47,7 @@ fn main() {
                     .build_global().unwrap();
             }
             solve(&args.file, *state_number, integrate_method,
-                  custom_method, potentials_file, *iteration_count,
+                  custom_method, use_potentials, *iteration_count,
                   delta_time,
                   thermostat, thermostat_params, temperature,
                   barostat, barostat_params, pressure);
@@ -60,16 +60,17 @@ fn main() {
             pressure,
             custom,
             custom_name,
-            all
+            all,
+            use_potentials,
         } => {
             if *all {
                 solve_macro(&args.file,true, true,
                             true, true, true,
-                            *custom, custom_name);
+                            *custom, custom_name, use_potentials);
             } else {
                 solve_macro(&args.file, *kinetic_energy, *potential_energy,
                             *thermal_energy, *temperature, *pressure,
-                            *custom, custom_name);
+                            *custom, custom_name, use_potentials);
             }
         }
         Commands::CheckImpulse => {

@@ -6,11 +6,21 @@ extern crate lazy_static;
 extern crate nalgebra as na;
 extern crate serde;
 
+use std::fs::{File, OpenOptions};
+use std::path::PathBuf;
 pub use particle::*;
 pub use particles_database::*;
 pub use save_data::*;
 
 pub const K_B: f64 = 1.380648528;
+
+pub fn open_file_or_create(path: &PathBuf) -> File {
+    if !path.exists() {
+        File::create(path)
+    } else {
+        OpenOptions::new().write(true).open(path)
+    }.expect("Can't write to file")
+}
 
 #[cfg(test)]
 mod tests {
