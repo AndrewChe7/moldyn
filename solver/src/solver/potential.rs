@@ -118,12 +118,11 @@ pub fn update_force(state: &mut State) {
             particle.temp = 0.0;
         });
     });
-
+    let old_particles = state.particles.clone();
     for particle_type1 in 0..particle_type_count {
         for particle_type2 in particle_type1..particle_type_count {
             let potential = get_potential(particle_type1 as u16, particle_type2 as u16);
             let r_cut = potential.get_radius_cut();
-            let old_particles = state.particles.clone();
             let slice = &mut state.particles[particle_type1][..];
             slice.par_iter_mut().enumerate().for_each(|(i, particle)| {
                 for j in 0..old_particles[particle_type2].len() {
@@ -150,12 +149,13 @@ pub fn update_force(state: &mut State) {
                     } else if r.z > bb.z / 2.0 {
                         r.z -= bb.z;
                     }
-                    if r.magnitude() > r_cut {
+                    let r_abs = r.norm();
+                    if r_abs > r_cut {
                         continue;
                     }
 
-                    let (potential, force) = potential.get_potential_and_force(r.magnitude());
-                    let force_vec = r.normalize() * force;
+                    let (potential, force) = potential.get_potential_and_force(r_abs);
+                    let force_vec = r / r_abs * force;
                     let t = force_vec.x * r.x + force_vec.y * r.y + force_vec.z * r.z;
                     particle.force += force_vec;
                     particle.potential += potential;

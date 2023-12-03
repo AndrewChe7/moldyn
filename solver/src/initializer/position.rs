@@ -1,5 +1,6 @@
 use moldyn_core::{Particle, ParticleDatabase, State};
 use na::Vector3;
+use rand::prelude::*;
 
 /// Particle creation errors
 /// * particle ID didn't found
@@ -133,6 +134,20 @@ pub fn initialize_particles(number_particles: &[usize], boundary: &Vector3<f64>)
         particles,
         boundary_box: boundary.clone(),
     })
+}
+
+/// Method just for testing. Initializes random positions.
+pub fn randomize_positions(state: &mut State,
+                           particle_id: u16,
+                           grid_size: (usize, usize, usize),
+                           unit_cell_size: f64,) {
+    let mut rng = StdRng::seed_from_u64(42);
+    for particle in state.particles[particle_id as usize].iter_mut() {
+        let x = rng.gen::<f64>() * grid_size.0 as f64 * unit_cell_size;
+        let y = rng.gen::<f64>() * grid_size.1 as f64 * unit_cell_size;
+        let z = rng.gen::<f64>() * grid_size.2 as f64 * unit_cell_size;
+        particle.position = [x, y, z].into();
+    }
 }
 
 /// Initialize particles position on  `unit_cell_type`-grid of size `grid_size` in `start_position`

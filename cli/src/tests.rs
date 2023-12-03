@@ -56,7 +56,7 @@ fn solvation() {
     data.save_to_file(&path, 0);
     ParticleDatabase::save_particles_data(&path).expect("");
     solve(&path, 0, &IntegratorChoose::VerletMethod,
-          &None, &None, 3, &0.002,
+          &None, &false, 3, &0.002,
           &None, &None, &None,
           &None, &None, &None);
     let data = StateToSave::load_from_file(&path, 3);

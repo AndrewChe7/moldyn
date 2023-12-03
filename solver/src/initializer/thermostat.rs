@@ -38,9 +38,9 @@ impl Thermostat {
                   particle_type_id: u16, _target_temperature: f64) {
         match self {
             Thermostat::Berendsen {lambda, ..} => {
-                for particle in state.particles[particle_type_id as usize].iter_mut() {
+                state.particles[particle_type_id as usize].iter_mut().for_each(|particle| {
                     particle.velocity *= *lambda;
-                }
+                });
             }
             Thermostat::Custom {
                 ..

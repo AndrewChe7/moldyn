@@ -43,9 +43,9 @@ impl Barostat {
                 myu, ..
             } => {
                 state.boundary_box *= *myu;
-                for particle in state.particles[particle_type_id as usize].iter_mut() {
+                state.particles[particle_type_id as usize].iter_mut().for_each(|particle| {
                     particle.position *= *myu;
-                }
+                });
             }
             Barostat::Custom {
                 ..

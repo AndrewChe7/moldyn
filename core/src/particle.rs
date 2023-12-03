@@ -119,13 +119,25 @@ impl State {
     /// Makes every particle to satisfy periodic boundary conditions.
     pub fn apply_boundary_conditions(&mut self) {
         let bb = &self.boundary_box;
-        for particle_type in self.particles.iter_mut() {
+        self.particles.iter_mut().for_each(|particle_type| {
             particle_type.iter_mut().for_each(|particle| {
-                particle.position.x = particle.position.x.rem_euclid(bb.x);
-                particle.position.y = particle.position.y.rem_euclid(bb.y);
-                particle.position.z = particle.position.z.rem_euclid(bb.z);
-            });
-        }
+                if particle.position.x < 0.0 {
+                    particle.position.x += bb.x;
+                } else if particle.position.x >= bb.x {
+                    particle.position.x -= bb.x;
+                }
+                if particle.position.y < 0.0 {
+                    particle.position.y += bb.y;
+                } else if particle.position.y >= bb.y {
+                    particle.position.y -= bb.y;
+                }
+                if particle.position.z < 0.0 {
+                    particle.position.z += bb.z;
+                } else if particle.position.z >= bb.z {
+                    particle.position.z -= bb.z;
+                }
+            })
+        });
     }
 
     /// Get minimal and maximum and maximum velocity of particles with type `particle_type_id`.

@@ -135,7 +135,7 @@ impl Into<State> for StateToSave {
                 max_id = particle.id;
             }
         }
-        for _ in 0..=max_id {
+        for _ in 0..(max_id + 1) {
             particles.push(vec![]);
         }
         for particle in self.particles.iter() {
