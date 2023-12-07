@@ -1,6 +1,6 @@
 use moldyn_core::State;
 use crate::initializer::{Barostat, Thermostat};
-use crate::solver::update_force;
+use crate::solver::{PotentialsDatabase, update_force};
 
 pub enum Integrator {
     /// <https://doi.org/10.1103/PhysRev.159.98>
@@ -11,7 +11,7 @@ pub enum Integrator {
 
 impl Integrator {
     /// Just integrator iteration
-    pub fn calculate(&self, state: &mut State, delta_time: f64,
+    pub fn calculate(&self, potentials_database: &PotentialsDatabase, state: &mut State, delta_time: f64,
                      barostat: &mut Option<(&mut Barostat, f64)>, thermostat: &mut Option<(&mut Thermostat, f64)>) {
         match self {
             Integrator::VerletMethod => {
@@ -43,7 +43,7 @@ impl Integrator {
                     });
                 });
                 state.apply_boundary_conditions();
-                update_force(state);
+                update_force(potentials_database, state);
                 state.particles.iter_mut().for_each(|particle_type| {
                     let mass = particle_type[0].mass;
                     let temp = delta_time / (2.0 * mass);

@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 use moldyn_core::{DataFileMacro, VectorData, MacroParameterType, ParticleDatabase, State, StateToSave, open_file_or_create};
 use moldyn_solver::initializer::UnitCell;
 use moldyn_solver::macro_parameters::get_momentum_of_system;
-use moldyn_solver::solver::{Integrator, load_potentials_from_file, Potential, save_potentials_to_file, set_potential, update_force};
+use moldyn_solver::solver::{Integrator, Potential, PotentialsDatabase, update_force};
 use crate::args::{BarostatChoose, CrystalCellType, IntegratorChoose, PotentialChoose, ThermostatChoose};
 
 
@@ -20,12 +20,14 @@ pub fn backup_macro(data: &mut DataFileMacro, out_file: &PathBuf) {
 }
 
 pub fn generate_default_potentials(file: &PathBuf) {
-    set_potential(0, 0, Potential::new_lennard_jones(0.3418, 1.712));
-    save_potentials_to_file(file);
+    let mut potentials_database = PotentialsDatabase::new();
+    potentials_database.set_potential(0, 0, Potential::new_lennard_jones(0.3418, 1.712));
+    potentials_database.save_potentials_to_file(file);
 }
 
 pub fn add_potential_to_file(file: &PathBuf, particles: &Vec<u16>, potential: &PotentialChoose, params: &Vec<f64>) {
-    load_potentials_from_file(file);
+    let mut potentials_database = PotentialsDatabase::new();
+    potentials_database.load_potentials_from_file(file);
     let potential = match potential {
         PotentialChoose::LennardJones => {
             Potential::new_lennard_jones(params[0], params[1])
@@ -34,8 +36,8 @@ pub fn add_potential_to_file(file: &PathBuf, particles: &Vec<u16>, potential: &P
             todo!()
         }
     };
-    set_potential(particles[0], particles[1], potential);
-    save_potentials_to_file(file);
+    potentials_database.set_potential(particles[0], particles[1], potential);
+    potentials_database.save_potentials_to_file(file);
 }
 
 pub fn initialize(file: &PathBuf,
@@ -92,11 +94,12 @@ pub fn solve(file: &PathBuf,
              pressure: &Option<f64>) {
     let data = StateToSave::load_from_file(file, state_number);
     ParticleDatabase::load_particles_data(file).expect("Can't load particle database");
+    let mut potentials_database = PotentialsDatabase::new();
     let mut state = data.into();
     if *use_potentials {
-        load_potentials_from_file(file);
+        potentials_database.load_potentials_from_file(file);
     }
-    update_force(&mut state);
+    update_force(&potentials_database, &mut state);
     let integrator = match integrator {
         IntegratorChoose::VerletMethod => {
             Integrator::VerletMethod
@@ -179,7 +182,7 @@ pub fn solve(file: &PathBuf,
     for i in 0..iteration_count {
         let data = StateToSave::from(&state);
         data.save_to_file(file, state_number + i);
-        integrator.calculate(&mut state, *delta_time, &mut barostat, &mut thermostat);
+        integrator.calculate(&potentials_database, &mut state, *delta_time, &mut barostat, &mut thermostat);
         pb.inc(1);
     }
     pb.finish_with_message("Calculated.");
@@ -209,8 +212,9 @@ pub fn solve_macro(file: &PathBuf,
                    use_potentials: &bool) {
     let paths = fs::read_dir(file.join("data"))
         .expect("Can't read directory");
+    let mut potentials_database = PotentialsDatabase::new();
     if *use_potentials {
-        load_potentials_from_file(file);
+        potentials_database.load_potentials_from_file(file);
     }
     let start = 0;
     let end = get_last_path(paths);
@@ -227,7 +231,7 @@ pub fn solve_macro(file: &PathBuf,
         let state_data = StateToSave::load_from_file(file, i);
         let mut state: moldyn_core::State = state_data.into();
         let particle_count = state.particles.iter().map( |t| t.len() ).sum();
-        update_force(&mut state);
+        update_force(&potentials_database, &mut state);
         let mut parameters = vec![];
         if kinetic_energy {
             let value = moldyn_solver::macro_parameters::get_kinetic_energy(&state, 0);
