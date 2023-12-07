@@ -119,11 +119,11 @@ mod tests {
         let slice = state.particles[0].as_slice();
         slice.into_iter().all(|particle| {
             particle.position.x >= 0.0
-                && particle.position.x <= bb.x
+                && particle.position.x < bb.x
                 && particle.position.y >= 0.0
-                && particle.position.y <= bb.y
+                && particle.position.y < bb.y
                 && particle.position.z >= 0.0
-                && particle.position.z <= bb.z
+                && particle.position.z < bb.z
         })
     }
 
@@ -132,8 +132,8 @@ mod tests {
         let mut p = Particle::default();
         let mut rng = rand::thread_rng();
         p.position.x = rng.gen();
-        p.position.y = rng.gen();
-        p.position.z = 3.0;
+        p.position.y = 1.1;
+        p.position.z = 1.0;
         let mut state = State {
             particles: vec![vec![p]],
             boundary_box: Vector3::new(1.0, 1.0, 1.0),

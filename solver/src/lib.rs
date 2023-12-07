@@ -62,13 +62,14 @@ mod tests {
         let verlet_method = Integrator::VerletMethod;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         let mut state = initialize_particles(&[8], &bounding_box).unwrap();
+        let potentials_db = PotentialsDatabase::new();
         initialize_particles_position(UnitCell::U, &mut state, 0, (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't initialize particles");
         initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
-        update_force(&mut state);
+        update_force(&potentials_db, &mut state);
         check_momentum(&state);
         for _ in 0..100000 {
-            verlet_method.calculate(&mut state, 0.002, &mut None, &mut None);
+            verlet_method.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut None);
             check_momentum(&state);
         }
     }
@@ -96,7 +97,8 @@ mod tests {
             particles: vec![vec![p1, p2]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        update_force(&mut state);
+        let potentials_db = PotentialsDatabase::new();
+        update_force(&potentials_db, &mut state);
         let force_p1 = &state.particles[0][0]
             .force;
         assert_eq!(format!("{:.8}", force_p1.x), "6.67445797");
@@ -119,7 +121,8 @@ mod tests {
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
         let verlet = Integrator::VerletMethod;
-        update_force(&mut state); // Initialize forces
+        let potentials_db = PotentialsDatabase::new();
+        update_force(&potentials_db, &mut state); // Initialize forces
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -154,7 +157,7 @@ mod tests {
             assert_eq!(format!("{:.8}", f2.y), "0.00000000");
             assert_eq!(format!("{:.8}", f2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
+        verlet.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -188,7 +191,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
+        verlet.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -222,7 +225,7 @@ mod tests {
             assert_eq!(format!("{:.8}", v2.y), "1.00000000");
             assert_eq!(format!("{:.8}", v2.z), "0.00000000");
         }
-        verlet.calculate(&mut state, 0.002, &mut None, &mut None);
+        verlet.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut None);
         {
             let p1 = &state.particles[0][0];
             let p2 = &state.particles[0][1];
@@ -272,10 +275,11 @@ mod tests {
             particles: vec![vec![p1, p2]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
+        let potentials_db = PotentialsDatabase::new();
         let verlet = Integrator::VerletMethod;
-        update_force(&mut state); // Initialize forces
+        update_force(&potentials_db, &mut state); // Initialize forces
         for _ in 0..999 {
-            verlet.calculate(&mut state, 0.002, &mut None, &mut None);
+            verlet.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut None);
         }
         {
             let p1 = &state.particles[0][0];
@@ -341,7 +345,8 @@ mod tests {
             particles: vec![vec![p1, p2]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        update_force(&mut state);
+        let potentials_db = PotentialsDatabase::new();
+        update_force(&potentials_db, &mut state);
         let mv = get_center_of_mass_velocity(&state, 0);
         assert_eq!(mv, Vector3::new(0.0, 1.0, 0.0));
         let e_kinetic = get_kinetic_energy(&state, 0);
@@ -385,7 +390,8 @@ mod tests {
             particles: vec![vec![p1, p2]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        update_force(&mut state);
+        let potentials_db = PotentialsDatabase::new();
+        update_force(&potentials_db, &mut state);
         let mv = get_center_of_mass_velocity(&state, 0);
         let e_thermal = get_thermal_energy(&state, 0, &mv);
         let temperature = get_temperature(e_thermal, 2);
@@ -410,7 +416,8 @@ mod tests {
             particles: vec![vec![p1, p2]],
             boundary_box: Vector3::new(2.0, 2.0, 2.0),
         };
-        update_force(&mut state);
+        let potentials_db = PotentialsDatabase::new();
+        update_force(&potentials_db, &mut state);
         let mv = get_center_of_mass_velocity(&state, 0);
         let pressure = get_pressure(&state, 0, &mv);
         assert_eq!(
@@ -428,15 +435,16 @@ mod tests {
         initialize_particles_position(UnitCell::U, &mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
+        let potentials_db = PotentialsDatabase::new();
         initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
-        update_force(&mut state);
+        update_force(&potentials_db, &mut state);
         let mut berendsen = Thermostat::Berendsen {
             tau: 0.5,
             lambda: 0.0,
         };
         let verlet = Integrator::VerletMethod;
         for _ in 0..100000 {
-            verlet.calculate(&mut state, 0.002, &mut None, &mut Some((&mut berendsen, 273.15)));
+            verlet.calculate(&potentials_db, &mut state, 0.002, &mut None, &mut Some((&mut berendsen, 273.15)));
         }
         let mv = get_center_of_mass_velocity(&state, 0);
         let thermal_energy = get_thermal_energy(&state, 0, &mv);
@@ -451,11 +459,12 @@ mod tests {
         let bb = Vector3::new(2.0, 2.0, 2.0) * 3.338339;
         ParticleDatabase::add(0, "Argon", 66.335, 0.071);
         let mut state = initialize_particles(&[8], &bb).unwrap();
+        let potentials_db = PotentialsDatabase::new();
         initialize_particles_position(UnitCell::U, &mut state, 0,
                                       (0.0, 0.0, 0.0), (2, 2, 2), 3.338339)
             .expect("Can't init particles");
         initialize_velocities_maxwell_boltzmann(&mut state, 273.15, 0);
-        update_force(&mut state);
+        update_force(&potentials_db, &mut state);
         let mut berendsen = Barostat::Berendsen {
             beta: 1.0,
             tau: 0.1,
@@ -463,9 +472,9 @@ mod tests {
         };
         let verlet = Integrator::VerletMethod;
         for _ in 0..100000 {
-            verlet.calculate(&mut state, 0.002, &mut Some((&mut berendsen, 0.101325)), &mut None);
+            verlet.calculate(&potentials_db, &mut state, 0.002, &mut Some((&mut berendsen, 0.101325)), &mut None);
         }
-        update_force(&mut state);
+        update_force(&potentials_db, &mut state);
         let mv = get_center_of_mass_velocity(&state, 0);
         let pressure = get_pressure(&state, 0, &mv);
         println!("{:.15} ", pressure);

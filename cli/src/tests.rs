@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use tempdir::TempDir;
 use moldyn_core::{ParticleDatabase, StateToSave};
-use moldyn_solver::solver::update_force;
+use moldyn_solver::solver::{PotentialsDatabase, update_force};
 use crate::args::{CrystalCellType, IntegratorChoose};
 use crate::commands::{initialize, solve};
 
@@ -52,6 +52,7 @@ fn solvation() {
         particles: vec![vec![p1, p2]],
         boundary_box: Vector3::new(2.0, 2.0, 2.0),
     };
+    let potentials_db = PotentialsDatabase::new();
     let data = StateToSave::from(&state);
     data.save_to_file(&path, 0);
     ParticleDatabase::save_particles_data(&path).expect("");
@@ -61,7 +62,7 @@ fn solvation() {
           &None, &None, &None);
     let data = StateToSave::load_from_file(&path, 3);
     let mut state = data.into();
-    update_force(&mut state);
+    update_force(&potentials_db, &mut state);
     let p1 = &state.particles[0][0];
     let p2 = &state.particles[0][1];
     let pos1 = p1.position;
