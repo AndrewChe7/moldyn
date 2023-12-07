@@ -115,6 +115,15 @@ pub fn solve(file: &PathBuf,
                         lambda: 0.0,
                     }
                 }
+                ThermostatChoose::NoseHoover => {
+                    moldyn_solver::initializer::Thermostat::NoseHoover {
+                        freq: thermostat_params.clone()
+                            .expect("No thermostat parameters. Need frequency for Nose-Hoover")
+                            [0],
+                        psi: 0.0,
+                        lambda: 0.0,
+                    }
+                }
                 ThermostatChoose::Custom => {
                     todo!()
                 }

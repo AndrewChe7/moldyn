@@ -7,6 +7,11 @@ pub enum Thermostat {
         tau: f64,
         lambda: f64,
     },
+    NoseHoover {
+        psi: f64,
+        freq: f64,
+        lambda: f64,
+    },
     /// Doesn't implemented yet
     Custom {
         name: String,
@@ -27,6 +32,13 @@ impl Thermostat {
                 let lambda_squared = 1.0 + delta_time / *tau * (target_temperature / temperature - 1.0);
                 *lambda = lambda_squared.sqrt();
             }
+            Thermostat::NoseHoover { freq,  psi, lambda} => {
+                let psi_dot = *freq * *freq * ((temperature / target_temperature) - 1.0);
+                *psi += psi_dot * (delta_time / 2.0);
+                let psi_dot = *freq * *freq * ((temperature / target_temperature) - 1.0);
+                *psi += psi_dot * (delta_time / 2.0);
+                *lambda = f64::exp(-*psi * delta_time / 2.0);
+            }
             Thermostat::Custom { .. } => {
                 todo!()
             }
@@ -37,7 +49,7 @@ impl Thermostat {
     pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64,
                   particle_type_id: u16, _target_temperature: f64) {
         match self {
-            Thermostat::Berendsen {lambda, ..} => {
+            Thermostat::Berendsen {lambda, ..} | Thermostat::NoseHoover { lambda, ..} => {
                 state.particles[particle_type_id as usize].iter_mut().for_each(|particle| {
                     particle.velocity *= *lambda;
                 });

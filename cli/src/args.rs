@@ -46,6 +46,7 @@ pub enum BarostatChoose {
 pub enum ThermostatChoose {
     /// <https://pure.rug.nl/ws/files/64380902/1.448118.pdf>
     Berendsen,
+    NoseHoover,
     /// Custom method (doesn't implemented yet)
     Custom,
 }
