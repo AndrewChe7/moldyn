@@ -32,7 +32,7 @@ impl Integrator {
                         particle.velocity = particle.velocity + particle.force * temp;
                     });
                 });
-                if let Some((thermostat, target_temperature)) = thermostat.as_ref() {
+                if let Some((thermostat, target_temperature)) = thermostat.as_mut() {
                     (0..state.particles.len()).for_each(|particle_type| {
                         thermostat.update(state, delta_time, particle_type as u16, *target_temperature);
                     });
@@ -51,7 +51,7 @@ impl Integrator {
                         particle.velocity += particle.force * temp;
                     });
                 });
-                if let Some((barostat, target_pressure)) = barostat.as_ref() {
+                if let Some((barostat, target_pressure)) = barostat.as_mut() {
                     (0..state.particles.len()).for_each(|particle_type| {
                         barostat.update(state, delta_time, particle_type as u16, *target_pressure);
                     });

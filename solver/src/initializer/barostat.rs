@@ -36,7 +36,7 @@ impl Barostat {
     }
 
     /// Resize current state
-    pub fn update(&self, state: &mut moldyn_core::State, _delta_time: f64,
+    pub fn update(&mut self, state: &mut moldyn_core::State, _delta_time: f64,
                   particle_type_id: u16, _target_pressure: f64) {
         match self {
             Barostat::Berendsen {
